@@ -1,0 +1,3473 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartLabel Pro v5.0</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <style>
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    body {
+      font-family: "Microsoft YaHei", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #e5e7eb;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* 工作区背景 */
+    #workspace-container {
+      background-color: #e5e7eb;
+      background-image: radial-gradient(#94a3b8 1px, transparent 1px);
+      background-size: 20px 20px;
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* 画布容器 */
+    #canvas-wrapper {
+      background-color: transparent;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+      transform-origin: center center;
+      z-index: 1;
+    }
+
+    /* 标尺样式 */
+    .ruler-canvas {
+      position: absolute;
+      background-color: #f8fafc;
+      border-color: #cbd5e1;
+      z-index: 50;
+      pointer-events: none;
+    }
+
+    #ruler-h {
+      top: 0;
+      left: 20px;
+      width: calc(100% - 20px);
+      height: 20px;
+      border-bottom: 1px solid #cbd5e1;
+    }
+
+    #ruler-v {
+      top: 20px;
+      left: 0;
+      width: 20px;
+      height: calc(100% - 20px);
+      border-right: 1px solid #cbd5e1;
+    }
+
+    #ruler-corner {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 20px;
+      height: 20px;
+      background: #f1f5f9;
+      z-index: 60;
+      border-right: 1px solid #cbd5e1;
+      border-bottom: 1px solid #cbd5e1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #64748b;
+      font-weight: bold;
+    }
+
+    .tab-btn.active {
+      border-bottom: 2px solid #3b82f6;
+      color: #3b82f6;
+      background-color: #eff6ff;
+      font-weight: 600;
+    }
+
+    .segment-item {
+      transition: all 0.2s;
+      cursor: grab;
+    }
+
+    .segment-item:active {
+      cursor: grabbing;
+    }
+
+    .segment-item.dragging {
+      opacity: 0.5;
+      background: #eef2ff;
+      border-color: #3b82f6;
+      transform: scale(0.98);
+    }
+
+    .fade-out {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+
+    /* -- UI优化: 新按钮组 -- */
+    .style-group {
+      display: flex;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+    }
+
+    .style-group .style-btn {
+      border: none;
+      border-right: 1px solid #e2e8f0;
+      border-radius: 0;
+      margin: 0;
+    }
+
+    .style-group .style-btn:last-child {
+      border-right: none;
+    }
+
+    .style-btn {
+      padding: 6px;
+      background-color: #ffffff;
+      color: #64748b;
+      font-size: 12px;
+      flex: 1;
+      /* 关键：均分剩余宽度 */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: all 0.15s;
+    }
+
+    .style-btn:hover {
+      background-color: #f8fafc;
+    }
+
+    .style-btn.active {
+      background-color: #eff6ff;
+      color: #2563eb;
+      box-shadow: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+    }
+
+    /* -- UI优化: 颜色输入框 -- */
+    input[type="color"] {
+      -webkit-appearance: none;
+      border: none;
+      padding: 0;
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    input[type="color"]::-webkit-color-swatch {
+      border: none;
+      border-radius: 3px;
+    }
+
+    /* 自定义右侧面板细滚动条 */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+
+    .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+      background: #94a3b8;
+    }
+
+    .shape-submenu {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+    }
+
+    .shape-submenu.open {
+      max-height: 200px;
+    }
+
+    .rotate-icon {
+      transition: transform 0.3s;
+    }
+
+    .rotate-icon.open {
+      transform: rotate(90deg);
+    }
+
+    /* 对齐工具栏 */
+    .align-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 1px;
+      background: #f1f5f9;
+      border-radius: 6px;
+      padding: 2px;
+    }
+
+    .align-btn {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      color: #64748b;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: none;
+      background: transparent;
+    }
+
+    .align-btn:hover {
+      background: #fff;
+      color: #2563eb;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .align-btn:active {
+      transform: scale(0.92);
+    }
+
+    .align-sep {
+      width: 1px;
+      height: 20px;
+      background: #cbd5e1;
+      margin: 0 2px;
+    }
+
+    /* 字段拖拽项 */
+    .field-drag-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #1e40af;
+      cursor: grab;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .field-drag-item:hover {
+      background: #eff6ff;
+      border-color: #93c5fd;
+      box-shadow: 0 1px 4px rgba(59, 130, 246, 0.15);
+    }
+
+    .field-drag-item:active {
+      cursor: grabbing;
+    }
+
+    .field-drag-item.dragging-field {
+      opacity: 0.5;
+      background: #dbeafe;
+    }
+
+    #workspace-container.field-drop-target {
+      outline: 3px dashed #3b82f6;
+      outline-offset: -3px;
+    }
+
+    /* 打印预览 mini-tab */
+    .preview-mini-tab {
+      display: inline-flex;
+      background: #f1f5f9;
+      border-radius: 20px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .preview-mini-tab button {
+      padding: 3px 12px;
+      border-radius: 16px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #64748b;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .preview-mini-tab button.active {
+      background: #fff;
+      color: #2563eb;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    }
+
+    /* Excel 导入区域 */
+    .excel-drop-zone {
+      border: 2px dashed #bfdbfe;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: #eff6ff;
+    }
+
+    .excel-drop-zone:hover,
+    .excel-drop-zone.dragover {
+      border-color: #3b82f6;
+      background: #dbeafe;
+    }
+
+    .sheet-tab {
+      padding: 4px 12px;
+      font-size: 11px;
+      border-radius: 4px 4px 0 0;
+      border: 1px solid #e2e8f0;
+      border-bottom: none;
+      cursor: pointer;
+      background: #f8fafc;
+      color: #64748b;
+      transition: all 0.15s;
+    }
+
+    .sheet-tab.active {
+      background: #fff;
+      color: #2563eb;
+      font-weight: 600;
+      border-color: #bfdbfe;
+    }
+
+    .data-table-wrap {
+      overflow: auto;
+      max-height: 240px;
+      border: 1px solid #e2e8f0;
+      border-radius: 0 6px 6px 6px;
+    }
+
+    .data-table {
+      font-size: 11px;
+      border-collapse: collapse;
+      white-space: nowrap;
+    }
+
+    .data-table th {
+      background: #f1f5f9;
+      padding: 4px 8px;
+      border-bottom: 1px solid #e2e8f0;
+      border-right: 1px solid #e2e8f0;
+      font-weight: 600;
+      color: #334155;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .data-table td {
+      padding: 3px 8px;
+      border-bottom: 1px solid #f1f5f9;
+      border-right: 1px solid #f1f5f9;
+      color: #475569;
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .data-table tr:hover td {
+      background: #f8fafc;
+    }
+  </style>
+</head>
+
+<body class="h-screen flex flex-col text-slate-700">
+  <!-- 0. 欢迎界面 -->
+  <div id="welcome-screen" class="fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center text-center">
+    <div class="bg-blue-50 p-6 rounded-full mb-6 animate-bounce">
+      <i class="fa-solid fa-print text-6xl text-blue-600"></i>
+    </div>
+    <h1 class="text-4xl font-bold text-gray-800 mb-2">SmartLabel Pro v5.0</h1>
+    <p class="text-gray-500 mb-8 max-w-md">矢量条码二维码 · Excel数据源 · 对齐分布工具。<br />体验丝滑的设计流程。</p>
+    <button onclick="editor.ui.closeWelcome()"
+      class="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-lg font-medium transition transform hover:-translate-y-1">开始设计</button>
+  </div>
+
+  <!-- 打印预览弹窗 (Modal) 略，保持不变 -->
+  <div id="print-modal" class="fixed inset-0 z-50 bg-black/60 hidden flex items-center justify-center backdrop-blur-sm">
+    <div class="bg-white rounded-xl shadow-2xl w-[95%] h-[95%] flex overflow-hidden animate-[fadeIn_0.2s_ease-out]">
+      <!-- 左侧：参数设置 -->
+      <div class="w-80 bg-gray-50 border-r border-gray-200 flex flex-col">
+        <div class="p-4 border-b border-gray-200 bg-white">
+          <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2"><i
+              class="fa-solid fa-print text-blue-600"></i> 打印设置</h2>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-6">
+          <div class="space-y-2">
+            <button onclick="editor.print.executePrint()"
+              class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold shadow hover:bg-blue-700 transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-print"></i> 立即打印 / 下载 PDF
+            </button>
+            <button onclick="document.getElementById('print-modal').classList.add('hidden')"
+              class="w-full bg-white border border-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-50">
+              返回设计
+            </button>
+          </div>
+          <div class="bg-white border border-gray-200 p-3 rounded-lg shadow-sm">
+            <label class="block text-xs font-bold text-gray-700 mb-2">打印数量 / 序列号数量</label>
+            <div class="flex items-center gap-2">
+              <input type="number" id="print-copies" value="1" min="1"
+                class="w-full border rounded px-2 py-1 text-sm font-bold text-center"
+                onchange="editor.print.updateTotalCount()" />
+              <span class="text-xs text-gray-500">组</span>
+            </div>
+            <p class="text-[10px] text-gray-400 mt-1">若设置了序列号重复，实际打印张数 = 数量 x 重复数。</p>
+          </div>
+          <div id="print-vars-container">
+            <h3 class="text-sm font-bold text-gray-700 mb-2 border-b pb-1">本次打印变量</h3>
+            <div id="print-vars-list" class="space-y-2"></div>
+          </div>
+          <div class="bg-blue-50 p-3 rounded text-xs text-blue-800 space-y-1">
+            <div>
+              <span class="font-bold">打印总张数：</span>
+              <span id="print-total-count">0</span>
+            </div>
+            <div>
+              <span class="font-bold">纸张尺寸：</span>
+              <span id="print-paper-size">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="flex-1 bg-gray-200 flex flex-col relative overflow-hidden">
+        <div id="panel-single-preview" class="flex-1 flex items-center justify-center p-8 overflow-auto">
+          <img id="print-preview-img"
+            class="shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] bg-white object-contain transition-all duration-300"
+            style="max-width: 90%; max-height: 90%" />
+        </div>
+        <div id="panel-layout-preview" class="hidden flex-1 overflow-auto p-6">
+          <div id="layout-preview-pages" class="flex flex-col items-center gap-6"></div>
+        </div>
+        <div class="h-14 bg-white border-t border-gray-200 flex items-center justify-between px-6 gap-4">
+          <div id="single-nav" class="flex items-center gap-3 bg-gray-100 px-4 py-1.5 rounded-full">
+            <button onclick="editor.print.prevLabel()"
+              class="hover:text-blue-600 transition disabled:opacity-30 disabled:cursor-not-allowed"
+              id="btn-prev-label">
+              <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <span class="font-mono font-bold text-gray-700 w-20 text-center text-sm" id="preview-counter">1 / 1</span>
+            <button onclick="editor.print.nextLabel()"
+              class="hover:text-blue-600 transition disabled:opacity-30 disabled:cursor-not-allowed"
+              id="btn-next-label">
+              <i class="fa-solid fa-chevron-right"></i>
+            </button>
+          </div>
+          <div id="layout-nav" class="hidden text-xs text-gray-500 bg-gray-100 px-3 py-1.5 rounded-full">共 <span
+              id="layout-total-pages" class="font-bold text-gray-700">0</span> 页</div>
+          <div class="flex-1"></div>
+          <div id="preview-mode-tabs" class="preview-mini-tab hidden">
+            <button id="tab-single-preview" onclick="editor.print.switchPreviewTab('single')"
+              class="active">单张预览</button>
+            <button id="tab-layout-preview" onclick="editor.print.switchPreviewTab('layout')">整体排版</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1. 头部工具栏 -->
+  <header
+    class="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 z-10 shadow-sm relative shrink-0">
+    <div class="flex items-center gap-2">
+      <div class="bg-blue-600 text-white p-1.5 rounded-lg">
+        <i class="fa-solid fa-print"></i>
+      </div>
+      <h1 class="font-bold text-lg tracking-tight">SmartLabel <span
+          class="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500 font-normal">v5.0</span></h1>
+    </div>
+    <div class="flex items-center gap-1 flex-wrap">
+      <div class="bg-gray-100 p-0.5 rounded flex mr-2">
+        <button onclick="editor.tools.setMode('select')" id="btn-mode-select"
+          class="px-3 py-1.5 rounded text-sm transition bg-white shadow-sm text-blue-600" title="选择模式 (V)">
+          <i class="fa-solid fa-arrow-pointer"></i>
+        </button>
+        <button onclick="editor.tools.setMode('hand')" id="btn-mode-hand"
+          class="px-3 py-1.5 rounded text-sm transition text-gray-500 hover:text-gray-700" title="抓手模式 (Space)">
+          <i class="fa-solid fa-hand"></i>
+        </button>
+      </div>
+      <button onclick="editor.actions.resetView()" class="hover:bg-gray-100 px-3 py-1.5 rounded transition text-sm"
+        title="重置视图"><i class="fa-solid fa-compress"></i> 100%</button>
+      <div class="w-px h-6 bg-gray-300 mx-1"></div>
+      <button onclick="editor.actions.groupObjects()" class="hover:bg-gray-100 px-2 py-1.5 rounded transition text-sm"
+        title="组合"><i class="fa-solid fa-object-group"></i></button>
+      <button onclick="editor.actions.ungroupObjects()" class="hover:bg-gray-100 px-2 py-1.5 rounded transition text-sm"
+        title="取消组合"><i class="fa-solid fa-object-ungroup"></i></button>
+      <button onclick="editor.actions.bringForward()" class="hover:bg-gray-100 px-2 py-1.5 rounded transition text-sm"
+        title="上移一层"><i class="fa-solid fa-arrow-up"></i></button>
+      <button onclick="editor.actions.sendBackward()" class="hover:bg-gray-100 px-2 py-1.5 rounded transition text-sm"
+        title="下移一层"><i class="fa-solid fa-arrow-down"></i></button>
+      <div class="w-px h-6 bg-gray-300 mx-1"></div>
+      <button onclick="editor.actions.flipH()" class="hover:bg-gray-100 px-2 py-1.5 rounded transition text-sm"
+        title="水平翻转">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="7.25" y="1" width="1.5" height="14" rx="0.75" fill="currentColor" />
+          <path d="M5 4L1 8l4 4V4z" fill="currentColor" />
+          <path d="M11 4l4 4-4 4V4z" fill="currentColor" opacity="0.4" />
+        </svg>
+      </button>
+      <button onclick="editor.actions.flipV()" class="hover:bg-gray-100 px-2 py-1.5 rounded transition text-sm"
+        title="垂直翻转">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="1" y="7.25" width="14" height="1.5" rx="0.75" fill="currentColor" />
+          <path d="M4 5L8 1l4 4H4z" fill="currentColor" />
+          <path d="M4 11l4 4 4-4H4z" fill="currentColor" opacity="0.4" />
+        </svg>
+      </button>
+      <div class="w-px h-6 bg-gray-300 mx-1"></div>
+      <!-- 对齐工具栏 -->
+      <div class="align-toolbar" title="对齐与分布（需先选中多个元素）">
+        <select id="align-ref-mode" title="对齐参考"
+          class="text-[10px] border border-gray-200 rounded px-1 py-0.5 bg-white text-gray-600 h-[26px] mr-1">
+          <option value="canvas">画布</option>
+          <option value="selection">选区</option>
+        </select>
+        <button class="align-btn" onclick="editor.align.alignLeft()" title="左对齐"><i
+            class="fa-solid fa-align-left"></i></button>
+        <button class="align-btn" onclick="editor.align.alignCenterH()" title="水平居中"><i
+            class="fa-solid fa-align-center"></i></button>
+        <button class="align-btn" onclick="editor.align.alignRight()" title="右对齐"><i
+            class="fa-solid fa-align-right"></i></button>
+        <div class="align-sep"></div>
+        <button class="align-btn" onclick="editor.align.alignTop()" title="顶对齐">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="2" y="1" width="10" height="1.5" rx="0.5" fill="currentColor" />
+            <rect x="3" y="3" width="3" height="8" rx="1" fill="currentColor" />
+            <rect x="8" y="3" width="3" height="6" rx="1" fill="currentColor" />
+          </svg>
+        </button>
+        <button class="align-btn" onclick="editor.align.alignMiddleV()" title="垂直居中">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="2" y="6.25" width="10" height="1.5" rx="0.5" fill="currentColor" />
+            <rect x="3" y="3" width="3" height="8" rx="1" fill="currentColor" />
+            <rect x="8" y="4" width="3" height="6" rx="1" fill="currentColor" />
+          </svg>
+        </button>
+        <button class="align-btn" onclick="editor.align.alignBottom()" title="底对齐">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="2" y="11.5" width="10" height="1.5" rx="0.5" fill="currentColor" />
+            <rect x="3" y="3" width="3" height="8" rx="1" fill="currentColor" />
+            <rect x="8" y="5" width="3" height="6" rx="1" fill="currentColor" />
+          </svg>
+        </button>
+        <div class="align-sep"></div>
+        <button class="align-btn" onclick="editor.align.distributeH()" title="水平等距分布">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="0.5" y="3" width="1.5" height="8" rx="0.5" fill="currentColor" />
+            <rect x="12" y="3" width="1.5" height="8" rx="0.5" fill="currentColor" />
+            <rect x="4" y="4" width="2" height="6" rx="1" fill="currentColor" />
+            <rect x="8" y="4" width="2" height="6" rx="1" fill="currentColor" />
+          </svg>
+        </button>
+        <button class="align-btn" onclick="editor.align.distributeV()" title="垂直等距分布">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="3" y="0.5" width="8" height="1.5" rx="0.5" fill="currentColor" />
+            <rect x="3" y="12" width="8" height="1.5" rx="0.5" fill="currentColor" />
+            <rect x="4" y="4" width="6" height="2" rx="1" fill="currentColor" />
+            <rect x="4" y="8" width="6" height="2" rx="1" fill="currentColor" />
+          </svg>
+        </button>
+      </div>
+      <div class="w-px h-6 bg-gray-300 mx-1"></div>
+      <button onclick="editor.actions.clearCanvas()"
+        class="hover:bg-red-50 hover:text-red-600 px-2 py-1.5 rounded transition text-sm text-red-500" title="清空">
+        <i class="fa-solid fa-trash-can"></i>
+      </button>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="editor.print.openModal()"
+        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-md text-sm font-medium shadow transition flex items-center gap-2">
+        <i class="fa-solid fa-print"></i> 打印预览
+      </button>
+    </div>
+  </header>
+
+  <!-- 主体区域 -->
+  <main class="flex-1 flex overflow-hidden">
+    <!-- 左侧面板 -->
+    <aside class="w-[250px] bg-white border-r border-gray-200 flex flex-col z-20 shadow-xl shrink-0">
+      <!-- 侧边栏 TAB 头部 -->
+      <div class="flex border-b border-gray-200 bg-gray-50">
+        <button class="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 tab-btn active"
+          data-tab="left-tab-elements"><i class="fa-solid fa-shapes mr-1"></i> 元素库</button>
+        <button class="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 tab-btn" data-tab="left-tab-data"><i
+            class="fa-solid fa-database mr-1"></i> 数据源</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto relative custom-scrollbar">
+        <!-- TAB 1: 元素库 & 变量 -->
+        <div id="left-tab-elements" class="tab-content h-full flex flex-col">
+          <div class="p-4 grid grid-cols-4 gap-2 border-b border-gray-100 bg-white">
+            <button onclick="editor.tools.addText()"
+              class="aspect-square rounded-lg hover:bg-blue-50 hover:text-blue-600 flex flex-col items-center justify-center transition group text-gray-600 border border-transparent hover:border-blue-100">
+              <i class="fa-solid fa-font text-lg mb-1 group-hover:scale-110 transition"></i><span
+                class="text-[10px]">文本</span>
+            </button>
+            <button onclick="editor.tools.addRect()"
+              class="aspect-square rounded-lg hover:bg-blue-50 hover:text-blue-600 flex flex-col items-center justify-center transition group text-gray-600 border border-transparent hover:border-blue-100">
+              <i class="fa-regular fa-square text-lg mb-1 group-hover:scale-110 transition"></i><span
+                class="text-[10px]">矩形</span>
+            </button>
+            <button onclick="editor.tools.addCircle()"
+              class="aspect-square rounded-lg hover:bg-blue-50 hover:text-blue-600 flex flex-col items-center justify-center transition group text-gray-600 border border-transparent hover:border-blue-100">
+              <i class="fa-regular fa-circle text-lg mb-1 group-hover:scale-110 transition"></i><span
+                class="text-[10px]">圆形</span>
+            </button>
+            <button onclick="editor.tools.addLine()"
+              class="aspect-square rounded-lg hover:bg-blue-50 hover:text-blue-600 flex flex-col items-center justify-center transition group text-gray-600 border border-transparent hover:border-blue-100">
+              <i class="fa-solid fa-minus text-lg mb-1 group-hover:scale-110 transition"></i><span
+                class="text-[10px]">直线</span>
+            </button>
+            <button onclick="editor.tools.addBarcode()"
+              class="aspect-square rounded-lg hover:bg-blue-50 hover:text-blue-600 flex flex-col items-center justify-center transition group text-gray-600 border border-transparent hover:border-blue-100">
+              <i class="fa-solid fa-barcode text-lg mb-1 group-hover:scale-110 transition"></i><span
+                class="text-[10px]">条码</span>
+            </button>
+            <button onclick="editor.tools.addQRCode()"
+              class="aspect-square rounded-lg hover:bg-blue-50 hover:text-blue-600 flex flex-col items-center justify-center transition group text-gray-600 border border-transparent hover:border-blue-100">
+              <i class="fa-solid fa-qrcode text-lg mb-1 group-hover:scale-110 transition"></i><span
+                class="text-[10px]">二维码</span>
+            </button>
+            <button onclick="document.getElementById('img-upload').click()"
+              class="aspect-square rounded-lg hover:bg-blue-50 hover:text-blue-600 flex flex-col items-center justify-center transition group text-gray-600 border border-transparent hover:border-blue-100">
+              <i class="fa-regular fa-image text-lg mb-1 group-hover:scale-110 transition"></i><span
+                class="text-[10px]">图片</span>
+            </button>
+            <input type="file" id="img-upload" hidden="" accept="image/*" onchange="editor.tools.addImage(this)" />
+          </div>
+
+          <!-- 变量面板 -->
+          <div class="flex-1 p-4 bg-gray-50/50">
+            <div id="variable-panel">
+              <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-gray-800 text-sm"><i class="fa-solid fa-superscript mr-1 text-blue-500"></i>
+                  全局变量</h3>
+                <button onclick="editor.variables.add()"
+                  class="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200 transition shadow-sm">
+                  <i class="fa-solid fa-plus"></i> 新增
+                </button>
+              </div>
+              <div id="variables-list" class="space-y-3"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: 数据源 (Excel 导入) -->
+        <div id="left-tab-data" class="hidden tab-content p-4">
+          <div id="data-panel" class="space-y-3">
+            <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-100 text-xs text-yellow-800">
+              <i class="fa-solid fa-lightbulb mr-1"></i> 提示：导入 Excel 后，在元素内容中选择 <b>[数据源字段]</b>，打印时会自动按行生成多张标签。
+            </div>
+            <div class="excel-drop-zone" id="excel-drop-zone"
+              onclick="document.getElementById('excel-file-input').click()">
+              <input type="file" id="excel-file-input" hidden accept=".xlsx,.xls,.csv"
+                onchange="editor.excelData.loadFile(this)" />
+              <i class="fa-solid fa-file-excel text-3xl text-green-500 mb-2"></i>
+              <div class="text-sm font-bold text-gray-700">点击或拖拽 Excel 文件</div>
+              <div class="text-xs text-gray-400 mt-1">支持 .xlsx · .xls · .csv</div>
+            </div>
+            <div id="sheet-selector-wrap" class="hidden">
+              <div class="text-xs font-bold text-gray-600 mb-1"><i
+                  class="fa-solid fa-table-columns mr-1 text-blue-500"></i> 选择工作表</div>
+              <div id="sheet-tabs" class="flex flex-wrap gap-1 mb-2"></div>
+            </div>
+            <div id="field-chip-wrap" class="hidden">
+              <div class="flex items-center justify-between mb-2">
+                <div class="text-xs font-bold text-gray-700"><i class="fa-solid fa-tags mr-1 text-blue-500"></i> 可用字段
+                </div>
+                <span class="text-[10px] text-gray-400">拖到画布 / 点击插入</span>
+              </div>
+              <div id="field-chips" class="space-y-1 max-h-60 overflow-y-auto"></div>
+            </div>
+            <div class="flex justify-between text-xs items-center bg-white p-2 rounded border">
+              <span id="data-row-count" class="font-bold text-gray-600">0 行数据</span>
+              <div class="flex items-center gap-2">
+                <button onclick="editor.excelData.clearData()"
+                  class="text-red-400 hover:text-red-600 font-medium hidden" id="btn-clear-data"><i
+                    class="fa-solid fa-xmark mr-1"></i> 清除</button>
+                <button onclick="editor.builder.refreshAllText()"
+                  class="text-blue-600 hover:text-blue-800 font-medium"><i class="fa-solid fa-rotate-right mr-1"></i>
+                  刷新</button>
+              </div>
+            </div>
+            <table class="hidden" id="data-preview-table"></table>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 中间：画布工作区 -->
+    <section class="flex-1 relative z-40" id="workspace-container">
+      <div id="ruler-corner">mm</div>
+      <canvas id="ruler-h" class="ruler-canvas"></canvas>
+      <canvas id="ruler-v" class="ruler-canvas"></canvas>
+
+      <div id="canvas-wrapper">
+        <canvas id="c"></canvas>
+      </div>
+    </section>
+
+    <!-- ================= 右侧面板：属性设置 (优化后) ================= -->
+    <aside class="w-[260px] bg-white border-l border-gray-200 flex flex-col z-20 shadow-sm shrink-0">
+      <div class="h-10 border-b border-gray-200 flex items-center px-4 justify-between bg-gray-50/50 shrink-0">
+        <h3 class="font-bold text-gray-700 text-xs tracking-wider flex items-center gap-2"><i
+            class="fa-solid fa-sliders text-blue-500"></i> 设计属性</h3>
+      </div>
+
+      <div class="flex-1 overflow-y-auto custom-scrollbar bg-gray-50/30">
+        <div id="prop-panel">
+          <!-- 1. 标签全局属性 -->
+          <div id="label-props-container" class="space-y-0">
+            <!-- 画布设置 -->
+            <div class="px-4 py-4 border-b border-gray-200 bg-white">
+              <h4 class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3">画布设置</h4>
+              <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                <div class="flex flex-col gap-1">
+                  <label class="text-[10px] text-gray-500">宽度 (mm)</label>
+                  <div
+                    class="flex items-center border border-gray-200 rounded bg-gray-50 px-2 focus-within:border-blue-400 focus-within:bg-white transition-colors">
+                    <input type="number" id="setup-width" value="100"
+                      class="w-full bg-transparent border-none text-sm py-1.5 focus:ring-0 font-mono font-bold text-gray-700 text-center"
+                      oninput="editor.page.updateSize()" />
+                  </div>
+                </div>
+                <div class="text-gray-300 mt-5"><i class="fa-solid fa-xmark text-[10px]"></i></div>
+                <div class="flex flex-col gap-1">
+                  <label class="text-[10px] text-gray-500">高度 (mm)</label>
+                  <div
+                    class="flex items-center border border-gray-200 rounded bg-gray-50 px-2 focus-within:border-blue-400 focus-within:bg-white transition-colors">
+                    <input type="number" id="setup-height" value="60"
+                      class="w-full bg-transparent border-none text-sm py-1.5 focus:ring-0 font-mono font-bold text-gray-700 text-center"
+                      oninput="editor.page.updateSize()" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 打印纸张排版 -->
+            <div class="px-4 py-4 border-b border-gray-200 bg-white">
+              <h4 class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3">打印纸张排版</h4>
+              <label
+                class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer select-none bg-gray-50 hover:bg-gray-100 p-2 rounded border border-gray-200 transition-colors mb-2">
+                <input type="checkbox" id="paper-match-label" checked onchange="editor.page.togglePaperSettings()"
+                  class="rounded text-blue-500 focus:ring-blue-500" />
+                <span class="font-medium">尺寸一致 <span class="text-gray-400 font-normal">(标签机适用)</span></span>
+              </label>
+
+              <div id="paper-advanced-settings" class="hidden space-y-3">
+                <div class="flex flex-col gap-1">
+                  <label class="text-[10px] text-gray-500">纸张预设</label>
+                  <select id="paper-preset" onchange="editor.page.applyPaperPreset()"
+                    class="w-full border border-gray-200 rounded px-2 py-1.5 text-xs bg-white focus:border-blue-400 outline-none">
+                    <option value="custom">自定义尺寸</option>
+                    <option value="a4">A4 (210 × 297)</option>
+                    <option value="letter">Letter (215.9 × 279.4)</option>
+                  </select>
+                </div>
+
+                <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                  <input type="checkbox" id="paper-landscape" onchange="editor.page.toggleLandscape()"
+                    class="rounded" />
+                  <span>横向排版 (Landscape)</span>
+                </label>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[10px] text-gray-500">纸宽 (mm)</label>
+                    <input type="number" id="paper-width" value="210"
+                      class="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:border-blue-400 font-mono outline-none"
+                      oninput="editor.state.paper.width = parseFloat(this.value) || 210" />
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[10px] text-gray-500">纸高 (mm)</label>
+                    <input type="number" id="paper-height" value="297"
+                      class="w-full border border-gray-200 rounded px-2 py-1.5 text-xs focus:border-blue-400 font-mono outline-none"
+                      oninput="editor.state.paper.height = parseFloat(this.value) || 297" />
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 bg-gray-50 p-2 rounded border border-gray-200">
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[10px] text-gray-500">上边距</label>
+                    <input type="number" id="layout-margin-top" value="10"
+                      class="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:border-blue-400 font-mono outline-none"
+                      oninput="editor.state.paper.marginTop = parseFloat(this.value) || 0" />
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[10px] text-gray-500">左边距</label>
+                    <input type="number" id="layout-margin-left" value="5"
+                      class="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:border-blue-400 font-mono outline-none"
+                      oninput="editor.state.paper.marginLeft = parseFloat(this.value) || 0" />
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[10px] text-gray-500">列间距 (Gap X)</label>
+                    <input type="number" id="layout-gap-x" value="2"
+                      class="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:border-blue-400 font-mono outline-none"
+                      oninput="editor.state.paper.gapX = parseFloat(this.value) || 0" />
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[10px] text-gray-500">行间距 (Gap Y)</label>
+                    <input type="number" id="layout-gap-y" value="2"
+                      class="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:border-blue-400 font-mono outline-none"
+                      oninput="editor.state.paper.gapY = parseFloat(this.value) || 0" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. 元素选中属性 (默认隐藏) -->
+          <div id="element-props-container" class="hidden space-y-0">
+            <!-- 位置与尺寸 -->
+            <div class="px-4 py-4 border-b border-gray-200 bg-white">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">布局 <span
+                    class="text-gray-400 normal-case font-normal">(mm)</span></h4>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div
+                  class="flex items-center border border-gray-200 rounded bg-white px-2 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all">
+                  <span class="text-gray-400 text-[10px] w-3 select-none">X</span>
+                  <input type="number" id="prop-left"
+                    class="w-full bg-transparent border-none text-xs py-1.5 focus:ring-0 text-gray-700 font-mono text-right" />
+                </div>
+                <div
+                  class="flex items-center border border-gray-200 rounded bg-white px-2 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all">
+                  <span class="text-gray-400 text-[10px] w-3 select-none">Y</span>
+                  <input type="number" id="prop-top"
+                    class="w-full bg-transparent border-none text-xs py-1.5 focus:ring-0 text-gray-700 font-mono text-right" />
+                </div>
+                <div
+                  class="flex items-center border border-gray-200 rounded bg-white px-2 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all">
+                  <span class="text-gray-400 text-[10px] w-3 select-none">W</span>
+                  <input type="number" id="prop-width"
+                    class="w-full bg-transparent border-none text-xs py-1.5 focus:ring-0 text-gray-700 font-mono text-right" />
+                </div>
+                <div
+                  class="flex items-center border border-gray-200 rounded bg-white px-2 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all">
+                  <span class="text-gray-400 text-[10px] w-3 select-none">H</span>
+                  <input type="number" id="prop-height"
+                    class="w-full bg-transparent border-none text-xs py-1.5 focus:ring-0 text-gray-700 font-mono text-right" />
+                </div>
+                <div
+                  class="flex items-center border border-gray-200 rounded bg-white px-2 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100 transition-all col-span-2">
+                  <span class="text-gray-400 text-[10px] w-4 select-none"><i
+                      class="fa-solid fa-rotate-right"></i></span>
+                  <input type="number" id="prop-angle"
+                    class="w-full bg-transparent border-none text-xs py-1.5 focus:ring-0 text-gray-700 font-mono text-right" />
+                  <span class="text-gray-400 text-[10px] ml-1 select-none">°</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 外观样式 -->
+            <div id="appearance-group" class="px-4 py-4 border-b border-gray-200 bg-white">
+              <h4 class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3">外观</h4>
+              <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <label class="text-xs text-gray-600">填充类型</label>
+                  <select id="prop-fill-type"
+                    class="w-28 border border-gray-200 rounded px-2 py-1 text-xs bg-white text-gray-700 outline-none focus:border-blue-400">
+                    <option value="solid">实心填充</option>
+                    <option value="none">无(仅描边)</option>
+                  </select>
+                </div>
+                <div class="flex items-center justify-between" id="fill-color-wrapper">
+                  <label class="text-xs text-gray-600">填充色</label>
+                  <div class="flex items-center justify-end w-28">
+                    <input type="color" id="prop-fill"
+                      class="w-6 h-6 rounded cursor-pointer border-0 p-0 !bg-transparent" />
+                  </div>
+                </div>
+                <div class="h-px bg-gray-100 my-2"></div>
+                <div class="flex items-center justify-between">
+                  <label class="text-xs text-gray-600">描边色</label>
+                  <div class="flex items-center justify-end w-28">
+                    <input type="color" id="prop-stroke"
+                      class="w-6 h-6 rounded cursor-pointer border-0 p-0 !bg-transparent" />
+                  </div>
+                </div>
+                <div class="flex items-center justify-between">
+                  <label class="text-xs text-gray-600">描边粗细</label>
+                  <div
+                    class="flex items-center border border-gray-200 rounded bg-white px-2 w-20 focus-within:border-blue-400">
+                    <input type="number" id="prop-stroke-width" min="0"
+                      class="w-full bg-transparent border-none text-xs py-1 focus:ring-0 text-center font-mono text-gray-700"
+                      placeholder="0" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 文本排版 -->
+            <div id="font-settings" class="hidden px-4 py-4 border-b border-gray-200 bg-white space-y-3">
+              <h4 class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3">文本属性</h4>
+              <div class="flex gap-2">
+                <select id="prop-font-family"
+                  class="flex-1 border border-gray-200 rounded px-2 py-1 text-xs bg-white text-gray-700 outline-none focus:border-blue-400">
+                  <option value="Arial">Arial</option>
+                  <option value="SimHei">黑体</option>
+                  <option value="Microsoft YaHei">微软雅黑</option>
+                </select>
+                <div
+                  class="flex items-center border border-gray-200 rounded bg-white px-1.5 w-16 focus-within:border-blue-400">
+                  <input type="number" id="prop-font-size"
+                    class="w-full bg-transparent border-none text-xs py-1 focus:ring-0 text-center font-mono text-gray-700" />
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <div class="style-group flex-1">
+                  <button class="style-btn" id="btn-bold"><i class="fa-solid fa-bold"></i></button>
+                  <button class="style-btn" id="btn-italic"><i class="fa-solid fa-italic"></i></button>
+                  <button class="style-btn" id="btn-underline"><i class="fa-solid fa-underline"></i></button>
+                  <button class="style-btn" id="btn-linethrough"><i class="fa-solid fa-strikethrough"></i></button>
+                </div>
+                <div class="style-group flex-1">
+                  <button class="style-btn" id="btn-align-left"><i class="fa-solid fa-align-left"></i></button>
+                  <button class="style-btn" id="btn-align-center"><i class="fa-solid fa-align-center"></i></button>
+                  <button class="style-btn" id="btn-align-right"><i class="fa-solid fa-align-right"></i></button>
+                  <button class="style-btn" id="btn-align-justify"><i class="fa-solid fa-align-justify"></i></button>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3 pt-1">
+                <div class="flex flex-col gap-1">
+                  <label class="text-[10px] text-gray-500">文字颜色</label>
+                  <input type="color" id="prop-text-color" class="w-full h-7 cursor-pointer" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="text-[10px] text-gray-500">背景颜色</label>
+                  <input type="color" id="prop-text-bg" class="w-full h-7 cursor-pointer" />
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2 pt-1">
+                <div
+                  class="flex items-center border border-gray-200 rounded bg-white px-2 focus-within:border-blue-400">
+                  <span class="text-gray-400 text-[10px] select-none" title="行高"><i
+                      class="fa-solid fa-arrows-up-down"></i></span>
+                  <input type="number" id="prop-line-height" step="0.1"
+                    class="w-full bg-transparent border-none text-xs py-1.5 focus:ring-0 text-right font-mono" />
+                </div>
+                <div
+                  class="flex items-center border border-gray-200 rounded bg-white px-2 focus-within:border-blue-400">
+                  <span class="text-gray-400 text-[10px] select-none" title="字间距"><i
+                      class="fa-solid fa-arrows-left-right"></i></span>
+                  <input type="number" id="prop-char-spacing"
+                    class="w-full bg-transparent border-none text-xs py-1.5 focus:ring-0 text-right font-mono" />
+                </div>
+              </div>
+            </div>
+
+            <!-- 内容拼接 -->
+            <div id="content-builder-group" class="hidden px-4 py-4 border-b border-gray-200 bg-gray-50/50">
+              <div class="flex justify-between items-center mb-3">
+                <h4 class="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center"><i
+                    class="fa-solid fa-link text-blue-400 mr-1"></i> 数据拼接</h4>
+                <div class="relative group">
+                  <button
+                    class="text-[10px] bg-white text-blue-600 px-2 py-1 rounded border border-gray-200 shadow-sm hover:border-blue-300 flex items-center gap-1 font-medium transition-colors">
+                    <i class="fa-solid fa-plus"></i> 添加
+                  </button>
+                  <div
+                    class="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 shadow-lg rounded-lg hidden group-hover:block z-50 overflow-hidden">
+                    <button onclick="editor.ui.addSegment('fixed')"
+                      class="block w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-gray-700">固定文本</button>
+                    <button onclick="editor.ui.addSegment('datasource')"
+                      class="block w-full text-left px-3 py-2 text-xs hover:bg-gray-50 font-bold text-blue-600">数据源字段</button>
+                    <button onclick="editor.ui.addSegment('variable')"
+                      class="block w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-purple-600">自定义变量</button>
+                    <button onclick="editor.ui.addSegment('serial')"
+                      class="block w-full text-left px-3 py-2 text-xs hover:bg-gray-50 font-bold text-green-600">序列号</button>
+                    <button onclick="editor.ui.addSegment('date')"
+                      class="block w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-orange-600">当前日期</button>
+                    <button onclick="editor.ui.addSegment('time')"
+                      class="block w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-orange-600">当前时间</button>
+                  </div>
+                </div>
+              </div>
+              <div id="segments-container" class="space-y-2 pb-2"></div>
+            </div>
+
+            <!-- 条码专属属性 -->
+            <div id="barcode-props-group" class="hidden px-4 py-4 border-b border-gray-200 bg-white">
+              <h4 class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5"><i
+                  class="fa-solid fa-barcode text-gray-400"></i> 条码配置</h4>
+              <div class="space-y-3">
+                <div class="flex flex-col gap-1">
+                  <label class="text-[10px] text-gray-500">码制格式</label>
+                  <select id="bc-format" onchange="editor.barcodeProps.update('format', this.value)"
+                    class="w-full border border-gray-200 rounded px-2 py-1.5 text-xs bg-white text-gray-700 outline-none focus:border-blue-400">
+                    <option value="CODE128">CODE 128（通用）</option>
+                    <option value="CODE39">CODE 39</option>
+                    <option value="EAN13">EAN-13</option>
+                    <option value="EAN8">EAN-8</option>
+                    <option value="UPC">UPC-A</option>
+                    <option value="ITF14">ITF-14</option>
+                    <option value="MSI">MSI Plessey</option>
+                    <option value="pharmacode">Pharmacode</option>
+                  </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[10px] text-gray-500">条码颜色</label>
+                    <input type="color" id="bc-linecolor" value="#000000"
+                      oninput="editor.barcodeProps.update('lineColor', this.value)" class="w-full h-7 cursor-pointer" />
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[10px] text-gray-500">背景颜色</label>
+                    <input type="color" id="bc-bgcolor" value="#ffffff"
+                      oninput="editor.barcodeProps.update('bgColor', this.value)" class="w-full h-7 cursor-pointer" />
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[10px] text-gray-500">条高 (px)</label>
+                    <div
+                      class="flex items-center border border-gray-200 rounded bg-white px-2 focus-within:border-blue-400">
+                      <input type="number" id="bc-height" value="60" min="10" max="300"
+                        oninput="editor.barcodeProps.update('barHeight', parseInt(this.value))"
+                        class="w-full bg-transparent border-none text-xs py-1.5 focus:ring-0 font-mono" />
+                    </div>
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[10px] text-gray-500">条宽比</label>
+                    <div
+                      class="flex items-center border border-gray-200 rounded bg-white px-2 focus-within:border-blue-400">
+                      <input type="number" id="bc-width" value="2" min="1" max="5" step="0.5"
+                        oninput="editor.barcodeProps.update('barWidth', parseFloat(this.value))"
+                        class="w-full bg-transparent border-none text-xs py-1.5 focus:ring-0 font-mono" />
+                    </div>
+                  </div>
+                </div>
+
+                <label
+                  class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer mt-2 pt-3 border-t border-gray-100">
+                  <input type="checkbox" id="bc-showtext" checked
+                    onchange="editor.barcodeProps.update('showText', this.checked)"
+                    class="rounded text-blue-500 focus:ring-blue-500" />
+                  <span class="font-medium">显示内容文字</span>
+                </label>
+
+                <div id="bc-text-opts" class="space-y-3 pl-3 border-l-2 border-gray-200 ml-1">
+                  <div class="grid grid-cols-2 gap-2">
+                    <div class="flex flex-col gap-1">
+                      <label class="text-[10px] text-gray-500">字号</label>
+                      <div
+                        class="flex items-center border border-gray-200 rounded bg-white px-2 focus-within:border-blue-400">
+                        <input type="number" id="bc-fontsize" value="14" min="6" max="40"
+                          oninput="editor.barcodeProps.update('fontSize', parseInt(this.value))"
+                          class="w-full bg-transparent border-none text-xs py-1.5 focus:ring-0 font-mono" />
+                      </div>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                      <label class="text-[10px] text-gray-500">位置</label>
+                      <select id="bc-textpos" onchange="editor.barcodeProps.update('textPosition', this.value)"
+                        class="w-full border border-gray-200 rounded px-2 py-1.5 text-xs bg-white outline-none focus:border-blue-400">
+                        <option value="bottom">下方</option>
+                        <option value="top">上方</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2">
+                    <div class="flex flex-col gap-1">
+                      <label class="text-[10px] text-gray-500">对齐</label>
+                      <select id="bc-textalign" onchange="editor.barcodeProps.update('textAlign', this.value)"
+                        class="w-full border border-gray-200 rounded px-2 py-1.5 text-xs bg-white outline-none focus:border-blue-400">
+                        <option value="center">居中</option>
+                        <option value="left">左对齐</option>
+                        <option value="right">右对齐</option>
+                      </select>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                      <label class="text-[10px] text-gray-500">间距</label>
+                      <div
+                        class="flex items-center border border-gray-200 rounded bg-white px-2 focus-within:border-blue-400">
+                        <input type="number" id="bc-textgap" value="2" min="0" max="30"
+                          oninput="editor.barcodeProps.update('textGap', parseInt(this.value))"
+                          class="w-full bg-transparent border-none text-xs py-1.5 focus:ring-0 font-mono" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 二维码专属属性 -->
+            <div id="qrcode-props-group" class="hidden px-4 py-4 border-b border-gray-200 bg-white">
+              <h4 class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5"><i
+                  class="fa-solid fa-qrcode text-gray-400"></i> 矩阵码配置</h4>
+              <div class="space-y-3">
+                <div class="flex flex-col gap-1">
+                  <label class="text-[10px] text-gray-500">码制类型</label>
+                  <select id="qr-codetype" onchange="editor.qrcodeProps.update('codeType', this.value)"
+                    class="w-full border border-gray-200 rounded px-2 py-1.5 text-xs bg-white text-gray-700 outline-none focus:border-blue-400">
+                    <option value="qr">QR Code（二维码）</option>
+                    <option value="micro_qr">Micro QR（微型二维码）</option>
+                    <option value="datamatrix">Data Matrix（数据矩阵）</option>
+                    <option value="aztec">Aztec Code（阿兹特克码）</option>
+                    <option value="pdf417">PDF417（堆叠条码）</option>
+                    <option value="code49">Code 49（堆叠线性码）</option>
+                  </select>
+                </div>
+                <div class="flex flex-col gap-1" id="qr-eclevel-row">
+                  <label class="text-[10px] text-gray-500">纠错级别</label>
+                  <select id="qr-eclevel" onchange="editor.qrcodeProps.update('ecLevel', this.value)"
+                    class="w-full border border-gray-200 rounded px-2 py-1.5 text-xs bg-white outline-none focus:border-blue-400">
+                    <option value="L">L — 低 (7%)</option>
+                    <option value="M" selected>M — 中 (15%)</option>
+                    <option value="Q">Q — 较高 (25%)</option>
+                    <option value="H">H — 高 (30%)</option>
+                  </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[10px] text-gray-500">码点颜色</label>
+                    <input type="color" id="qr-darkcolor" value="#000000"
+                      oninput="editor.qrcodeProps.update('darkColor', this.value)" class="w-full h-7 cursor-pointer" />
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[10px] text-gray-500">背景颜色</label>
+                    <input type="color" id="qr-lightcolor" value="#ffffff"
+                      oninput="editor.qrcodeProps.update('lightColor', this.value)" class="w-full h-7 cursor-pointer" />
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[10px] text-gray-500">模块样式</label>
+                    <select id="qr-style" onchange="editor.qrcodeProps.update('moduleStyle', this.value)"
+                      class="w-full border border-gray-200 rounded px-2 py-1.5 text-xs bg-white outline-none focus:border-blue-400">
+                      <option value="square">方形</option>
+                      <option value="round">圆角</option>
+                      <option value="dot">圆点</option>
+                    </select>
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[10px] text-gray-500">模块尺寸</label>
+                    <div
+                      class="flex items-center border border-gray-200 rounded bg-white px-2 focus-within:border-blue-400">
+                      <input type="number" id="qr-cellsize" value="8" min="3" max="20"
+                        oninput="editor.qrcodeProps.update('cellSize', parseInt(this.value))"
+                        class="w-full bg-transparent border-none text-xs py-1.5 focus:ring-0 font-mono" />
+                    </div>
+                  </div>
+                </div>
+
+                <label
+                  class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer mt-2 pt-3 border-t border-gray-100">
+                  <input type="checkbox" id="qr-showtext" onchange="editor.qrcodeProps.update('showText', this.checked)"
+                    class="rounded text-blue-500 focus:ring-blue-500" />
+                  <span class="font-medium">显示文字 (下方)</span>
+                </label>
+
+                <div id="qr-text-opts" class="space-y-3 pl-3 border-l-2 border-gray-200 ml-1 hidden">
+                  <div class="grid grid-cols-2 gap-2">
+                    <div class="flex flex-col gap-1">
+                      <label class="text-[10px] text-gray-500">字号</label>
+                      <div
+                        class="flex items-center border border-gray-200 rounded bg-white px-2 focus-within:border-blue-400">
+                        <input type="number" id="qr-fontsize" value="12" min="6" max="40"
+                          oninput="editor.qrcodeProps.update('fontSize', parseInt(this.value))"
+                          class="w-full bg-transparent border-none text-xs py-1.5 focus:ring-0 font-mono" />
+                      </div>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                      <label class="text-[10px] text-gray-500">文字颜色</label>
+                      <input type="color" id="qr-fontcolor" value="#000000"
+                        oninput="editor.qrcodeProps.update('fontColor', this.value)"
+                        class="w-full h-7 cursor-pointer" />
+                    </div>
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[10px] text-gray-500">文字距码间距</label>
+                    <div
+                      class="flex items-center border border-gray-200 rounded bg-white px-2 focus-within:border-blue-400">
+                      <input type="number" id="qr-textgap" value="3" min="0" max="30"
+                        oninput="editor.qrcodeProps.update('textGap', parseInt(this.value))"
+                        class="w-full bg-transparent border-none text-xs py-1.5 focus:ring-0 font-mono" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+  <script>
+    const customRotateIconSrc = "./dist/rotate.png";
+    const rotateImg = new Image();
+    rotateImg.src = customRotateIconSrc;
+    function renderRotationControl(ctx, left, top, styleOverride, fabricObject) {
+      if (fabricObject.__corner !== this.name) return;
+      const size = this.cornerSize;
+      ctx.save();
+      ctx.translate(left, top);
+      ctx.rotate(fabric.util.degreesToRadians(fabricObject.angle));
+      const cornerAngleAdjustment = {
+        mtr_tr: 0,
+        mtr_br: 90,
+        mtr_bl: 180,
+        mtr_tl: 270,
+      };
+      const adjustment = cornerAngleAdjustment[this.name] || 0;
+      ctx.rotate(fabric.util.degreesToRadians(adjustment));
+      if (rotateImg.complete) {
+        ctx.drawImage(rotateImg, -size / 2, -size / 2, size, size);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, size / 2, 0, 2 * Math.PI);
+        ctx.fillStyle = "#ccc";
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function createRotationControl(x, y, name) {
+      const offsetDist = 5;
+      return new fabric.Control({
+        name: name,
+        x: x,
+        y: y,
+        offsetX: x * offsetDist * 2.5,
+        offsetY: y * offsetDist * 2.5,
+        actionHandler: fabric.controlsUtils.rotationWithSnapping,
+        actionName: "rotate",
+        cursorStyle: "none",
+        render: renderRotationControl,
+        cornerSize: 24,
+        withConnection: false,
+      });
+    }
+
+    function applyCustomRotationControls(controlsConfig) {
+      controlsConfig.mtr_tl = createRotationControl(-0.5, -0.5, "mtr_tl");
+      controlsConfig.mtr_tr = createRotationControl(0.5, -0.5, "mtr_tr");
+      controlsConfig.mtr_bl = createRotationControl(-0.5, 0.5, "mtr_bl");
+      controlsConfig.mtr_br = createRotationControl(0.5, 0.5, "mtr_br");
+      delete controlsConfig.mtr;
+    }
+
+    fabric.Object.prototype.set({
+      transparentCorners: false,
+      cornerColor: "#2563eb",
+      cornerSize: 8,
+      cornerStrokeColor: "#fff",
+      borderColor: "#2563eb",
+      borderScaleFactor: 1,
+      centeredRotation: true,
+      lockScalingFlip: true,
+      strokeUniform: true,
+    });
+    applyCustomRotationControls(fabric.Object.prototype.controls);
+    applyCustomRotationControls(fabric.Textbox.prototype.controls);
+
+    const editor = {
+      canvas: null,
+      state: {
+        widthMm: 100,
+        heightMm: 60,
+        viewZoom: 1,
+        viewPanX: 0,
+        viewPanY: 0,
+        toolMode: "select",
+        isDragging: false,
+        lastMouseX: 0,
+        lastMouseY: 0,
+        suppressSelectionEvent: false,
+        variables: [{ id: "v1", name: "公司名", value: "测试科技" }],
+        dataRows: [],
+        headers: [],
+        paper: {
+          matchLabel: true,
+          preset: "custom",
+          width: 210,
+          height: 297,
+          landscape: false,
+          marginTop: 10,
+          marginLeft: 5,
+          gapX: 2,
+          gapY: 2,
+        },
+        previewIndex: 0,
+        tempPrintVars: {},
+        printCopies: 1,
+        draggedSegmentIndex: null,
+      },
+
+      init: function () {
+        this.canvas = new fabric.Canvas("c", {
+          preserveObjectStacking: true,
+          backgroundColor: "#ffffff",
+          selection: true,
+          enableRetinaScaling: true,
+          fireRightClick: true,
+          stopContextMenu: true,
+        });
+        this.canvas.on("mouse:move", (opt) => {
+          this.ruler.draw(opt.e.clientX, opt.e.clientY);
+          const target = this.canvas.getActiveObject();
+          if (target && target.__corner !== target._lastHoveredCorner) {
+            target._lastHoveredCorner = target.__corner;
+            this.canvas.requestRenderAll();
+          }
+        });
+        this.bindPropsEvents();
+        this.initViewControls();
+        this.ruler.init();
+        this.page.updateSize();
+        this.ui.initTabs();
+        this.ui.renderVariables();
+        this.data.parseData();
+
+        const dz = document.getElementById("excel-drop-zone");
+        if (dz) {
+          dz.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            dz.classList.add("dragover");
+          });
+          dz.addEventListener("dragleave", () => dz.classList.remove("dragover"));
+          dz.addEventListener("drop", (e) => {
+            e.preventDefault();
+            dz.classList.remove("dragover");
+            const file = e.dataTransfer.files[0];
+            if (file) {
+              const fakeInput = { files: [file] };
+              editor.excelData.loadFile(fakeInput);
+            }
+          });
+        }
+
+        editor.state._clipboard = null;
+
+        document.addEventListener("keydown", (e) => {
+          const tag = document.activeElement.tagName;
+          const editable = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || document.activeElement.isContentEditable;
+          if ((e.key === "Delete" || e.key === "Backspace") && tag === "BODY") {
+            this.actions.deleteActive();
+          }
+          if (e.code === "Space" && !e.repeat && !editable) {
+            editor.tools.setMode("hand");
+          }
+          if ((e.ctrlKey || e.metaKey) && e.key === "c" && !editable) editor.actions.copyActive();
+          if ((e.ctrlKey || e.metaKey) && e.key === "x" && !editable) {
+            editor.actions.copyActive();
+            editor.actions.deleteActive();
+          }
+          if ((e.ctrlKey || e.metaKey) && e.key === "v" && !editable) {
+            e.preventDefault();
+            editor.actions.pasteActive();
+          }
+          if ((e.ctrlKey || e.metaKey) && e.key === "d" && !editable) {
+            e.preventDefault();
+            editor.actions.copyActive();
+            editor.actions.pasteActive();
+          }
+        });
+        document.addEventListener("keyup", (e) => {
+          if (e.code === "Space") editor.tools.setMode("select");
+        });
+
+        document.addEventListener("paste", async (e) => {
+          const active = document.activeElement;
+          if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)) return;
+          const clipboardData = e.clipboardData || window.clipboardData;
+          if (!clipboardData || !clipboardData.items) return;
+          const items = clipboardData.items;
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.type.indexOf("image/") !== -1) {
+              e.preventDefault();
+              const blob = item.getAsFile();
+              if (!blob) continue;
+              const reader = new FileReader();
+              reader.onload = (ev) => {
+                const raw = ev.target.result;
+                const img = new Image();
+                img.onload = () => {
+                  let src = raw;
+                  const MAX_SIZE = 1200;
+                  if (img.width > MAX_SIZE || img.height > MAX_SIZE || raw.length > 500000) {
+                    const cvs = document.createElement("canvas");
+                    const scale = Math.min(MAX_SIZE / img.width, MAX_SIZE / img.height, 1);
+                    cvs.width = Math.round(img.width * scale);
+                    cvs.height = Math.round(img.height * scale);
+                    const ctx = cvs.getContext("2d");
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillRect(0, 0, cvs.width, cvs.height);
+                    ctx.drawImage(img, 0, 0, cvs.width, cvs.height);
+                    src = cvs.toDataURL("image/jpeg", 0.85);
+                  }
+                  fabric.Image.fromURL(src, (fImg) => {
+                    const labelW = editor.utils.mmToPx(editor.state.widthMm);
+                    const labelH = editor.utils.mmToPx(editor.state.heightMm);
+                    const maxW = labelW * 0.8;
+                    const maxH = labelH * 0.8;
+                    const scaleFit = Math.min(maxW / fImg.width, maxH / fImg.height, 1);
+                    fImg.set({
+                      scaleX: scaleFit,
+                      scaleY: scaleFit,
+                      left: (labelW - fImg.width * scaleFit) / 2,
+                      top: (labelH - fImg.height * scaleFit) / 2,
+                    });
+                    editor.canvas.add(fImg);
+                    editor.canvas.setActiveObject(fImg);
+                    editor.canvas.requestRenderAll();
+                  });
+                };
+                img.src = raw;
+              };
+              reader.readAsDataURL(blob);
+              break;
+            }
+          }
+        });
+        window.addEventListener("resize", () => {
+          this.ruler.draw();
+          this.actions.resetView();
+        });
+      },
+
+      ruler: {
+        h: null,
+        v: null,
+        ctxH: null,
+        ctxV: null,
+        init: function () {
+          this.h = document.getElementById("ruler-h");
+          this.v = document.getElementById("ruler-v");
+          this.ctxH = this.h.getContext("2d");
+          this.ctxV = this.v.getContext("2d");
+        },
+        draw: function (mouseX, mouseY) {
+          if (!this.h || !this.v) return;
+          const zoom = editor.state.viewZoom;
+          const container = document.getElementById("workspace-container");
+          const wrapper = document.getElementById("canvas-wrapper");
+          const cw = container.clientWidth - 20;
+          const ch = container.clientHeight - 20;
+          const dpr = window.devicePixelRatio || 1;
+          this.h.width = cw * dpr;
+          this.h.height = 20 * dpr;
+          this.v.width = 20 * dpr;
+          this.v.height = ch * dpr;
+          this.ctxH.scale(dpr, dpr);
+          this.ctxV.scale(dpr, dpr);
+          this.ctxH.clearRect(0, 0, cw, 20);
+          this.ctxV.clearRect(0, 0, 20, ch);
+          this.ctxH.fillStyle = "#f8fafc";
+          this.ctxH.fillRect(0, 0, cw, 20);
+          this.ctxV.fillStyle = "#f8fafc";
+          this.ctxV.fillRect(0, 0, 20, ch);
+          const containerRect = container.getBoundingClientRect();
+          const wrapperRect = wrapper.getBoundingClientRect();
+          const startX = wrapperRect.left - containerRect.left - 20;
+          const startY = wrapperRect.top - containerRect.top - 20;
+          const pxPerMm = editor.utils.mmToPx(1) * zoom;
+          let stepMm = 1;
+          if (pxPerMm < 4) stepMm = 5;
+          if (pxPerMm < 2) stepMm = 10;
+          if (pxPerMm < 0.5) stepMm = 50;
+          this.ctxH.fillStyle = "#64748b";
+          this.ctxV.fillStyle = "#64748b";
+          this.ctxH.font = "10px sans-serif";
+          this.ctxV.font = "10px sans-serif";
+          this.ctxH.strokeStyle = "#cbd5e1";
+          this.ctxV.strokeStyle = "#cbd5e1";
+          this.ctxH.beginPath();
+          const minMmX = Math.floor(-startX / pxPerMm);
+          const maxMmX = Math.ceil((cw - startX) / pxPerMm);
+          for (let mm = Math.floor(minMmX / stepMm) * stepMm; mm <= maxMmX; mm += stepMm) {
+            const x = startX + mm * pxPerMm;
+            const isMajor = mm % (stepMm * 10) === 0;
+            const height = isMajor ? 12 : mm % (stepMm * 5) === 0 ? 8 : 5;
+            this.ctxH.moveTo(x, 20);
+            this.ctxH.lineTo(x, 20 - height);
+            if (isMajor) this.ctxH.fillText(mm, x + 2, 10);
+          }
+          this.ctxH.stroke();
+          this.ctxV.beginPath();
+          const minMmY = Math.floor(-startY / pxPerMm);
+          const maxMmY = Math.ceil((ch - startY) / pxPerMm);
+          for (let mm = Math.floor(minMmY / stepMm) * stepMm; mm <= maxMmY; mm += stepMm) {
+            const y = startY + mm * pxPerMm;
+            const isMajor = mm % (stepMm * 10) === 0;
+            const width = isMajor ? 12 : mm % (stepMm * 5) === 0 ? 8 : 5;
+            this.ctxV.moveTo(20, y);
+            this.ctxV.lineTo(20 - width, y);
+            if (isMajor) {
+              this.ctxV.save();
+              this.ctxV.translate(10, y + 2);
+              this.ctxV.rotate(-Math.PI / 2);
+              this.ctxV.fillText(mm, 2, 0);
+              this.ctxV.restore();
+            }
+          }
+          this.ctxV.stroke();
+          if (mouseX !== undefined) {
+            const relX = mouseX - containerRect.left - 20;
+            const relY = mouseY - containerRect.top - 20;
+            if (relX >= 0 && relX <= cw) {
+              this.ctxH.strokeStyle = "#ef4444";
+              this.ctxH.beginPath();
+              this.ctxH.moveTo(relX, 0);
+              this.ctxH.lineTo(relX, 20);
+              this.ctxH.stroke();
+            }
+            if (relY >= 0 && relY <= ch) {
+              this.ctxV.strokeStyle = "#ef4444";
+              this.ctxV.beginPath();
+              this.ctxV.moveTo(0, relY);
+              this.ctxV.lineTo(20, relY);
+              this.ctxV.stroke();
+            }
+          }
+        },
+      },
+
+      initViewControls: function () {
+        const container = document.getElementById("workspace-container");
+        setTimeout(() => this.actions.resetView(), 100);
+        container.addEventListener(
+          "wheel",
+          (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            let newZoom = this.state.viewZoom * delta;
+            newZoom = Math.min(Math.max(newZoom, 0.1), 10);
+            this.state.viewZoom = newZoom;
+            this.updateViewTransform();
+          },
+          { passive: false },
+        );
+        container.addEventListener("mousedown", (e) => {
+          if (e.button === 1 || this.state.toolMode === "hand" || e.altKey) {
+            this.state.isDragging = true;
+            this.state.lastMouseX = e.clientX;
+            this.state.lastMouseY = e.clientY;
+            container.style.cursor = "grabbing";
+          }
+        });
+        window.addEventListener("mousemove", (e) => {
+          if (this.state.isDragging) {
+            const dx = e.clientX - this.state.lastMouseX;
+            const dy = e.clientY - this.state.lastMouseY;
+            this.state.viewPanX += dx;
+            this.state.viewPanY += dy;
+            this.state.lastMouseX = e.clientX;
+            this.state.lastMouseY = e.clientY;
+            this.updateViewTransform();
+          }
+        });
+        window.addEventListener("mouseup", () => {
+          this.state.isDragging = false;
+          container.style.cursor = this.state.toolMode === "hand" ? "grab" : "default";
+        });
+      },
+
+      updateViewTransform: function () {
+        const wrapper = document.getElementById("canvas-wrapper");
+        const baseW = editor.utils.mmToPx(editor.state.widthMm);
+        const baseH = editor.utils.mmToPx(editor.state.heightMm);
+        const zoomedW = baseW * this.state.viewZoom;
+        const zoomedH = baseH * this.state.viewZoom;
+        editor.canvas.setWidth(zoomedW);
+        editor.canvas.setHeight(zoomedH);
+        editor.canvas.setZoom(this.state.viewZoom);
+        wrapper.style.transform = `translate(${this.state.viewPanX}px, ${this.state.viewPanY}px)`;
+        editor.canvas.requestRenderAll();
+        this.ruler.draw();
+        const container = document.getElementById("workspace-container");
+        const offsetX = this.state.viewPanX % 20;
+        const offsetY = this.state.viewPanY % 20;
+        container.style.backgroundPosition = `${offsetX}px ${offsetY}px`;
+      },
+
+      actions: {
+        resetView: function () {
+          editor.state.viewPanX = 0;
+          editor.state.viewPanY = 0;
+          editor.state.viewZoom = 1;
+          editor.updateViewTransform();
+        },
+        deleteActive: function () {
+          const a = editor.canvas.getActiveObjects();
+          if (a.length) {
+            editor.canvas.discardActiveObject();
+            a.forEach((o) => editor.canvas.remove(o));
+          }
+        },
+        clearCanvas: function () {
+          Swal.fire({
+            title: "确定清空画布?",
+            showCancelButton: true,
+            confirmButtonText: "确定",
+            cancelButtonText: "取消",
+          }).then((r) => {
+            if (r.isConfirmed) {
+              editor.canvas.clear();
+              editor.canvas.setBackgroundColor("#ffffff", editor.canvas.renderAll.bind(editor.canvas));
+            }
+          });
+        },
+        groupObjects: function () {
+          const o = editor.canvas.getActiveObject();
+          if (o && o.type === "activeSelection") {
+            o.toGroup();
+            editor.canvas.requestRenderAll();
+          }
+        },
+        ungroupObjects: function () {
+          const o = editor.canvas.getActiveObject();
+          if (o && o.type === "group") {
+            o.toActiveSelection();
+            editor.canvas.requestRenderAll();
+          }
+        },
+        bringForward: () => {
+          const o = editor.canvas.getActiveObject();
+          if (o) o.bringForward();
+          editor.canvas.requestRenderAll();
+        },
+        sendBackward: () => {
+          const o = editor.canvas.getActiveObject();
+          if (o) o.sendBackwards();
+          editor.canvas.requestRenderAll();
+        },
+        copyActive: function () {
+          const active = editor.canvas.getActiveObject();
+          if (!active) return;
+          active.clone(
+            (cloned) => {
+              editor.state._clipboard = { obj: cloned, offsetX: 20, offsetY: 20 };
+            },
+            ["smartConfig", "customType", "barcodeConfig", "qrcodeConfig", "editable", "lockScalingX", "flipX", "flipY"],
+          );
+        },
+        pasteActive: function () {
+          const cb = editor.state._clipboard;
+          if (!cb) return;
+          cb.obj.clone(
+            (cloned) => {
+              editor.canvas.discardActiveObject();
+              cloned.set({ left: (cloned.left || 0) + cb.offsetX, top: (cloned.top || 0) + cb.offsetY, evented: true });
+              if (cloned.type === "activeSelection") {
+                cloned.canvas = editor.canvas;
+                cloned.forEachObject((obj) => editor.canvas.add(obj));
+                cloned.setCoords();
+              } else {
+                editor.canvas.add(cloned);
+              }
+              cb.offsetX += 20;
+              cb.offsetY += 20;
+              editor.canvas.setActiveObject(cloned);
+              editor.canvas.requestRenderAll();
+            },
+            ["smartConfig", "customType", "barcodeConfig", "qrcodeConfig", "editable", "lockScalingX", "flipX", "flipY"],
+          );
+        },
+        flipH: function () {
+          const sel = editor.canvas.getActiveObject();
+          if (!sel) return;
+          const center = sel.getCenterPoint();
+          sel.set("flipX", !sel.flipX);
+          sel.set("angle", -sel.angle);
+          sel.setPositionByOrigin(center, "center", "center");
+          sel.setCoords();
+          editor.canvas.requestRenderAll();
+        },
+        flipV: function () {
+          const sel = editor.canvas.getActiveObject();
+          if (!sel) return;
+          const center = sel.getCenterPoint();
+          sel.set("flipY", !sel.flipY);
+          sel.set("angle", -sel.angle);
+          sel.setPositionByOrigin(center, "center", "center");
+          sel.setCoords();
+          editor.canvas.requestRenderAll();
+        },
+      },
+
+      align: {
+        _getCanvasRect: function () {
+          return { left: 0, top: 0, width: editor.utils.mmToPx(editor.state.widthMm), height: editor.utils.mmToPx(editor.state.heightMm) };
+        },
+        _alignObjects: function (type) {
+          const sel = editor.canvas.getActiveObject();
+          if (!sel) {
+            Swal.fire({ toast: true, position: "top", icon: "warning", title: "请先选中元素", showConfirmButton: false, timer: 1500 });
+            return;
+          }
+          const mode = document.getElementById("align-ref-mode")?.value || "canvas";
+          if (mode === "canvas") {
+            const canvasRect = this._getCanvasRect();
+            const b = sel.getBoundingRect();
+            let dx = 0,
+              dy = 0;
+            if (type === "left") dx = canvasRect.left - b.left;
+            if (type === "centerH") dx = canvasRect.left + canvasRect.width / 2 - (b.left + b.width / 2);
+            if (type === "right") dx = canvasRect.left + canvasRect.width - (b.left + b.width);
+            if (type === "top") dy = canvasRect.top - b.top;
+            if (type === "middleV") dy = canvasRect.top + canvasRect.height / 2 - (b.top + b.height / 2);
+            if (type === "bottom") dy = canvasRect.top + canvasRect.height - (b.top + b.height);
+            if (dx !== 0 || dy !== 0) {
+              sel.set({ left: sel.left + dx, top: sel.top + dy });
+              sel.setCoords();
+            }
+          } else {
+            if (sel.type !== "activeSelection") return;
+            const refBounds = sel.getBoundingRect();
+            const objs = sel.getObjects();
+            editor.canvas.discardActiveObject();
+            objs.forEach((o) => {
+              const b = o.getBoundingRect();
+              let dx = 0,
+                dy = 0;
+              if (type === "left") dx = refBounds.left - b.left;
+              if (type === "centerH") dx = refBounds.left + refBounds.width / 2 - (b.left + b.width / 2);
+              if (type === "right") dx = refBounds.left + refBounds.width - (b.left + b.width);
+              if (type === "top") dy = refBounds.top - b.top;
+              if (type === "middleV") dy = refBounds.top + refBounds.height / 2 - (b.top + b.height / 2);
+              if (type === "bottom") dy = refBounds.top + refBounds.height - (b.top + b.height);
+              if (dx !== 0 || dy !== 0) {
+                o.set({ left: o.left + dx, top: o.top + dy });
+                o.setCoords();
+              }
+            });
+            editor.canvas.setActiveObject(new fabric.ActiveSelection(objs, { canvas: editor.canvas }));
+          }
+          editor.canvas.requestRenderAll();
+        },
+        alignLeft: function () {
+          this._alignObjects("left");
+        },
+        alignCenterH: function () {
+          this._alignObjects("centerH");
+        },
+        alignRight: function () {
+          this._alignObjects("right");
+        },
+        alignTop: function () {
+          this._alignObjects("top");
+        },
+        alignMiddleV: function () {
+          this._alignObjects("middleV");
+        },
+        alignBottom: function () {
+          this._alignObjects("bottom");
+        },
+        distributeH: function () {
+          const sel = editor.canvas.getActiveObject();
+          if (!sel || sel.type !== "activeSelection" || sel.getObjects().length < 3)
+            return Swal.fire({ toast: true, position: "top", icon: "warning", title: "需选中至少3个元素", showConfirmButton: false, timer: 1500 });
+          const objs = sel.getObjects();
+          editor.canvas.discardActiveObject();
+          const sorted = [...objs].sort((a, b) => a.getBoundingRect().left - b.getBoundingRect().left);
+          const first = sorted[0].getBoundingRect(),
+            last = sorted[sorted.length - 1].getBoundingRect();
+          const totalW = sorted.reduce((s, o) => s + o.getBoundingRect().width, 0);
+          const gap = (last.left + last.width - first.left - totalW) / (sorted.length - 1);
+          let cursor = first.left;
+          sorted.forEach((o) => {
+            o.set({ left: o.left + (cursor - o.getBoundingRect().left) });
+            o.setCoords();
+            cursor += o.getBoundingRect().width + gap;
+          });
+          editor.canvas.setActiveObject(new fabric.ActiveSelection(objs, { canvas: editor.canvas }));
+          editor.canvas.requestRenderAll();
+        },
+        distributeV: function () {
+          const sel = editor.canvas.getActiveObject();
+          if (!sel || sel.type !== "activeSelection" || sel.getObjects().length < 3)
+            return Swal.fire({ toast: true, position: "top", icon: "warning", title: "需选中至少3个元素", showConfirmButton: false, timer: 1500 });
+          const objs = sel.getObjects();
+          editor.canvas.discardActiveObject();
+          const sorted = [...objs].sort((a, b) => a.getBoundingRect().top - b.getBoundingRect().top);
+          const first = sorted[0].getBoundingRect(),
+            last = sorted[sorted.length - 1].getBoundingRect();
+          const totalH = sorted.reduce((s, o) => s + o.getBoundingRect().height, 0);
+          const gap = (last.top + last.height - first.top - totalH) / (sorted.length - 1);
+          let cursor = first.top;
+          sorted.forEach((o) => {
+            o.set({ top: o.top + (cursor - o.getBoundingRect().top) });
+            o.setCoords();
+            cursor += o.getBoundingRect().height + gap;
+          });
+          editor.canvas.setActiveObject(new fabric.ActiveSelection(objs, { canvas: editor.canvas }));
+          editor.canvas.requestRenderAll();
+        },
+      },
+
+      page: {
+        updateSize: function () {
+          const wMm = parseFloat(document.getElementById("setup-width").value) || 100;
+          const hMm = parseFloat(document.getElementById("setup-height").value) || 60;
+          editor.state.widthMm = wMm;
+          editor.state.heightMm = hMm;
+          editor.updateViewTransform();
+        },
+        togglePaperSettings: function () {
+          const isMatch = document.getElementById("paper-match-label").checked;
+          editor.state.paper.matchLabel = isMatch;
+          document.getElementById("paper-advanced-settings").classList.toggle("hidden", isMatch);
+        },
+        toggleLandscape: function () {
+          const isLandscape = document.getElementById("paper-landscape").checked;
+          const wInput = document.getElementById("paper-width");
+          const hInput = document.getElementById("paper-height");
+          const currentW = parseFloat(wInput.value);
+          const currentH = parseFloat(hInput.value);
+          if ((isLandscape && currentW < currentH) || (!isLandscape && currentW > currentH)) {
+            wInput.value = currentH;
+            hInput.value = currentW;
+          }
+          editor.state.paper.width = parseFloat(wInput.value);
+          editor.state.paper.height = parseFloat(hInput.value);
+          editor.state.paper.landscape = isLandscape;
+        },
+        applyPaperPreset: function () {
+          const preset = document.getElementById("paper-preset").value;
+          let w = 210,
+            h = 297;
+          if (preset === "letter") {
+            w = 215.9;
+            h = 279.4;
+          }
+          if (document.getElementById("paper-landscape").checked) {
+            let t = w;
+            w = h;
+            h = t;
+          }
+          document.getElementById("paper-width").value = w;
+          document.getElementById("paper-height").value = h;
+          editor.state.paper.width = w;
+          editor.state.paper.height = h;
+        },
+      },
+
+      tools: {
+        setMode: function (mode) {
+          editor.state.toolMode = mode;
+          const container = document.getElementById("workspace-container");
+          const btnSelect = document.getElementById("btn-mode-select");
+          const btnHand = document.getElementById("btn-mode-hand");
+          if (mode === "hand") {
+            container.style.cursor = "grab";
+            editor.canvas.selection = false;
+            editor.canvas.forEachObject((o) => (o.selectable = false));
+            btnHand.classList.add("bg-white", "shadow-sm", "text-blue-600");
+            btnHand.classList.remove("text-gray-500");
+            btnSelect.classList.remove("bg-white", "shadow-sm", "text-blue-600");
+            btnSelect.classList.add("text-gray-500");
+          } else {
+            container.style.cursor = "default";
+            editor.canvas.selection = true;
+            editor.canvas.forEachObject((o) => (o.selectable = true));
+            btnSelect.classList.add("bg-white", "shadow-sm", "text-blue-600");
+            btnSelect.classList.remove("text-gray-500");
+            btnHand.classList.remove("bg-white", "shadow-sm", "text-blue-600");
+            btnHand.classList.add("text-gray-500");
+          }
+        },
+        createSmartObject: function (fabricObj, config) {
+          fabricObj.set({
+            left: 50,
+            top: 50,
+            smartConfig: config,
+            editable: false,
+            lockScalingX: fabricObj.type === "textbox" ? false : false,
+          });
+          if (fabricObj.type === "textbox") fabricObj.on("mousedblclick", () => { });
+          editor.canvas.add(fabricObj);
+          editor.canvas.setActiveObject(fabricObj);
+          editor.builder.refreshObjectText(fabricObj, editor.state.dataRows[0] || {});
+          editor.canvas.requestRenderAll();
+        },
+        addText: function () {
+          this.createSmartObject(new fabric.Text("文本内容", { fontSize: 24, fontFamily: "Arial" }), { segments: [{ type: "fixed", value: "文本内容" }] });
+        },
+        addBarcode: function () {
+          const cfg = {
+            format: "CODE128",
+            lineColor: "#000000",
+            bgColor: "#ffffff",
+            barHeight: 60,
+            barWidth: 2,
+            showText: true,
+            fontSize: 14,
+            textPosition: "bottom",
+            textAlign: "center",
+            textGap: 2,
+          };
+          const group = editor.utils.renderBarcodeVector("12345678", cfg, null);
+          if (!group) return;
+          group.set({ left: 50, top: 50 });
+          group.smartConfig = { segments: [{ type: "fixed", value: "12345678" }] };
+          editor.canvas.add(group);
+          editor.canvas.setActiveObject(group);
+          editor.canvas.requestRenderAll();
+        },
+        addQRCode: function () {
+          const cfg = {
+            codeType: "qr",
+            ecLevel: "M",
+            darkColor: "#000000",
+            lightColor: "#ffffff",
+            moduleStyle: "square",
+            showText: false,
+            fontSize: 12,
+            fontColor: "#000000",
+            margin: 1,
+            cellSize: 8,
+          };
+          const group = editor.utils.renderCodeVector("https://example.com", cfg, null);
+          if (!group) return;
+          group.set({ left: 50, top: 50 });
+          group.smartConfig = { segments: [{ type: "fixed", value: "https://example.com" }] };
+          editor.canvas.add(group);
+          editor.canvas.setActiveObject(group);
+          editor.canvas.requestRenderAll();
+        },
+        addRect: function () {
+          editor.canvas.add(new fabric.Rect({ left: 50, top: 50, fill: "#cbd5e1", width: 100, height: 60, strokeWidth: 0, stroke: "#000000" }));
+          editor.canvas.requestRenderAll();
+        },
+        addCircle: function () {
+          editor.canvas.add(new fabric.Circle({ left: 50, top: 50, fill: "#cbd5e1", radius: 30, strokeWidth: 0, stroke: "#000000" }));
+          editor.canvas.requestRenderAll();
+        },
+        addLine: function () {
+          editor.canvas.add(new fabric.Line([0, 0, 100, 0], { left: 50, top: 50, stroke: "#64748b", strokeWidth: 2, strokeUniform: true }));
+          editor.canvas.requestRenderAll();
+        },
+        addImage: function (input) {
+          if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = (e) =>
+              fabric.Image.fromURL(e.target.result, (img) => {
+                img.scaleToWidth(80);
+                editor.canvas.add(img);
+                editor.canvas.requestRenderAll();
+              });
+            reader.readAsDataURL(input.files[0]);
+            input.value = "";
+          }
+        },
+      },
+
+      builder: {
+        types: [
+          { val: "fixed", label: "固定文本" },
+          { val: "datasource", label: "数据源字段" },
+          { val: "variable", label: "全局变量" },
+          { val: "date", label: "当前日期" },
+          { val: "time", label: "当前时间" },
+          { val: "serial", label: "序列号" },
+        ],
+        resolveValue: function (type, value, rowData = null, globalCounter = 0, tempVars = null, serialConfig = null) {
+          if (type === "fixed") return value;
+          if (type === "datasource") return rowData ? rowData[value] || "" : `[${value}]`;
+          if (type === "variable") {
+            if (tempVars && tempVars[value] !== undefined) return tempVars[value];
+            return editor.variables.getValue(value) || value;
+          }
+          if (type === "date") return dayjs().format("YYYY-MM-DD");
+          if (type === "time") return dayjs().format("HH:mm:ss");
+          if (type === "serial") {
+            const start = parseInt(value) || 1;
+            const step = parseInt(serialConfig?.step) || 1;
+            const repeat = parseInt(serialConfig?.repeat) || 1;
+            const direction = serialConfig?.direction === "dec" ? -1 : 1;
+            const increment = Math.floor(globalCounter / repeat) * step;
+            const result = start + increment * direction;
+            return String(result).padStart(value.length, "0");
+          }
+          return "";
+        },
+        refreshObjectText: function (obj, rowData = null, globalCounter = 0, tempVars = null) {
+          if (!obj.smartConfig || !obj.smartConfig.segments) return Promise.resolve();
+          let fullText = obj.smartConfig.segments.map((seg) => this.resolveValue(seg.type, seg.value, rowData, globalCounter, tempVars, seg)).join("");
+          if (obj.type === "textbox" || obj.type === "text") {
+            obj.set("text", fullText);
+            if (document.getElementById("prop-width") && editor.canvas.getActiveObject() === obj) {
+              document.getElementById("prop-width").value = editor.utils.pxToMm(obj.width * obj.scaleX).toFixed(1);
+              document.getElementById("prop-height").value = editor.utils.pxToMm(obj.height * obj.scaleY).toFixed(1);
+            }
+            return Promise.resolve();
+          } else if (obj.customType === "barcode") {
+            const cfg = obj.barcodeConfig || { format: "CODE128" };
+            return new Promise((resolve) => {
+              const newGroup = editor.utils.renderBarcodeVector(fullText, cfg, obj);
+              if (!newGroup) {
+                resolve();
+                return;
+              }
+              newGroup.set({
+                left: obj.left,
+                top: obj.top,
+                angle: obj.angle,
+                scaleX: obj.scaleX,
+                scaleY: obj.scaleY,
+                flipX: obj.flipX,
+                flipY: obj.flipY,
+                smartConfig: obj.smartConfig,
+                barcodeConfig: cfg,
+                customType: "barcode",
+                selectable: obj.selectable,
+              });
+              editor.state.suppressSelectionEvent = true;
+              const idx = editor.canvas.getObjects().indexOf(obj);
+              editor.canvas.remove(obj);
+              editor.canvas.insertAt(newGroup, idx);
+              const active = editor.canvas.getActiveObject();
+              if (active === obj || !active) {
+                editor.canvas.setActiveObject(newGroup);
+                if (document.getElementById("prop-width")) {
+                  document.getElementById("prop-width").value = editor.utils.pxToMm(newGroup.width * newGroup.scaleX).toFixed(1);
+                  document.getElementById("prop-height").value = editor.utils.pxToMm(newGroup.height * newGroup.scaleY).toFixed(1);
+                }
+              }
+              editor.state.suppressSelectionEvent = false;
+              resolve();
+            });
+          } else if (obj.customType === "qrcode") {
+            const cfg = obj.qrcodeConfig || { codeType: "qr", ecLevel: "M" };
+            return new Promise((resolve) => {
+              const newGroup = editor.utils.renderCodeVector(fullText, cfg, obj);
+              if (!newGroup) {
+                resolve();
+                return;
+              }
+              newGroup.set({
+                left: obj.left,
+                top: obj.top,
+                angle: obj.angle,
+                scaleX: obj.scaleX,
+                scaleY: obj.scaleY,
+                flipX: obj.flipX,
+                flipY: obj.flipY,
+                smartConfig: obj.smartConfig,
+                qrcodeConfig: cfg,
+                customType: "qrcode",
+                selectable: obj.selectable,
+              });
+              editor.state.suppressSelectionEvent = true;
+              const idx = editor.canvas.getObjects().indexOf(obj);
+              editor.canvas.remove(obj);
+              editor.canvas.insertAt(newGroup, idx);
+              const active = editor.canvas.getActiveObject();
+              if (active === obj || !active) {
+                editor.canvas.setActiveObject(newGroup);
+                if (document.getElementById("prop-width")) {
+                  document.getElementById("prop-width").value = editor.utils.pxToMm(newGroup.width * newGroup.scaleX).toFixed(1);
+                  document.getElementById("prop-height").value = editor.utils.pxToMm(newGroup.height * newGroup.scaleY).toFixed(1);
+                }
+              }
+              editor.state.suppressSelectionEvent = false;
+              resolve();
+            });
+          }
+          return Promise.resolve();
+        },
+        refreshAllText: function () {
+          editor.canvas.getObjects().forEach((obj) => this.refreshObjectText(obj, editor.state.dataRows[0]));
+          editor.canvas.requestRenderAll();
+        },
+      },
+
+      ui: {
+        syncTransformProps: function (obj) {
+          if (!obj) return;
+          const setVal = (id, val) => {
+            const el = document.getElementById(id);
+            if (el && document.activeElement !== el) el.value = editor.utils.pxToMm(val).toFixed(1);
+          };
+          setVal("prop-left", obj.left);
+          setVal("prop-top", obj.top);
+          setVal("prop-width", obj.getScaledWidth());
+          const isLine = obj.type === "line";
+          const hInput = document.getElementById("prop-height");
+          if (hInput && document.activeElement !== hInput) {
+            if (isLine) hInput.value = "-";
+            else hInput.value = editor.utils.pxToMm(obj.getScaledHeight()).toFixed(1);
+          }
+          const aInput = document.getElementById("prop-angle");
+          if (aInput && document.activeElement !== aInput) {
+            aInput.value = (obj.angle || 0).toFixed(0);
+          }
+        },
+        initTabs: function () {
+          const buttons = document.querySelectorAll(".tab-btn");
+          const contents = document.querySelectorAll(".tab-content");
+          buttons.forEach((btn) => {
+            btn.addEventListener("click", (e) => {
+              buttons.forEach((b) => b.classList.remove("active"));
+              contents.forEach((c) => c.classList.add("hidden"));
+              const targetBtn = e.currentTarget;
+              targetBtn.classList.add("active");
+              const tabId = targetBtn.dataset.tab;
+              const content = document.getElementById(tabId);
+              if (content) content.classList.remove("hidden");
+            });
+          });
+        },
+        closeWelcome: function () {
+          document.getElementById("welcome-screen").classList.add("fade-out");
+          setTimeout(() => (document.getElementById("welcome-screen").style.display = "none"), 500);
+        },
+        renderVariables: function () {
+          const list = document.getElementById("variables-list");
+          if (!list) return;
+          list.innerHTML = "";
+          editor.state.variables.forEach((v) => {
+            const div = document.createElement("div");
+            div.className = "flex gap-1 items-center bg-white p-1 rounded border border-gray-200 shadow-sm";
+            div.innerHTML = `
+                <div class="flex-4 min-w-0">
+                    <input 
+                        type="text" 
+                        value="${v.name}" 
+                        oninput="editor.variables.update('${v.id}','name',this.value)" 
+                        class="w-full text-xs border rounded p-1 font-bold text-gray-700 bg-gray-50 
+                               overflow-hidden text-ellipsis whitespace-nowrap min-w-0"
+                        placeholder="变量名"
+                        title="${v.name}">
+                </div>
+                <div class="flex-7 min-w-0">
+                    <input 
+                        type="text" 
+                        value="${v.value}" 
+                        oninput="editor.variables.update('${v.id}','value',this.value)" 
+                        class="w-full text-xs border rounded p-1 text-gray-600 
+                               overflow-hidden text-ellipsis whitespace-nowrap min-w-0"
+                        placeholder="默认值"
+                        title="${v.value}">
+                </div>
+                <button onclick="editor.variables.remove('${v.id}')" 
+                        class="text-gray-400 hover:text-red-500 p-1 flex-shrink-0">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            `;
+            list.appendChild(div);
+          });
+        },
+        togglePropsPanel: function (hasSelection) {
+          const labelProps = document.getElementById("label-props-container");
+          const elementProps = document.getElementById("element-props-container");
+          if (hasSelection) {
+            labelProps.classList.add("hidden");
+            elementProps.classList.remove("hidden");
+          } else {
+            labelProps.classList.remove("hidden");
+            elementProps.classList.add("hidden");
+          }
+        },
+        renderElementProps: function (obj) {
+          ["left", "top", "width", "height"].forEach((k) => {
+            let val = obj.get(k);
+            if (k === "width") val = obj.width * obj.scaleX;
+            if (k === "height") val = obj.height * obj.scaleY;
+            const el = document.getElementById(`prop-${k}`);
+            if (el) el.value = editor.utils.pxToMm(val).toFixed(1);
+          });
+
+          const isLine = obj.type === "line";
+          const hInput = document.getElementById("prop-height");
+          if (hInput) {
+            hInput.disabled = isLine;
+            if (isLine) {
+              hInput.value = "-";
+              hInput.classList.add("bg-gray-100", "text-gray-400", "cursor-not-allowed");
+            } else {
+              hInput.classList.remove("bg-gray-100", "text-gray-400", "cursor-not-allowed");
+            }
+          }
+
+          document.getElementById("prop-angle").value = (obj.angle || 0).toFixed(0);
+          const fillType = obj.fill === "transparent" || obj.fill === null ? "none" : "solid";
+          document.getElementById("prop-fill-type").value = fillType;
+          const colorInput = document.getElementById("prop-fill");
+          colorInput.disabled = fillType === "none";
+
+          if (fillType === "solid") colorInput.value = obj.fill || "#000000";
+          document.getElementById("prop-stroke").value = obj.stroke || "#000000";
+          document.getElementById("prop-stroke-width").value = obj.strokeWidth || 0;
+
+          const fontSettings = document.getElementById("font-settings");
+          const contentBuilder = document.getElementById("content-builder-group");
+          const barcodeGroup = document.getElementById("barcode-props-group");
+          const qrcodeGroup = document.getElementById("qrcode-props-group");
+          const appearanceGroup = document.getElementById("appearance-group");
+
+          if (fontSettings) fontSettings.classList.add("hidden");
+          if (contentBuilder) contentBuilder.classList.add("hidden");
+          if (barcodeGroup) barcodeGroup.classList.add("hidden");
+          if (qrcodeGroup) qrcodeGroup.classList.add("hidden");
+
+          if (obj.customType === "barcode") {
+            if (barcodeGroup) barcodeGroup.classList.remove("hidden");
+            if (appearanceGroup) appearanceGroup.classList.add("hidden");
+            editor.barcodeProps.syncUI(obj);
+            if (obj.smartConfig && obj.smartConfig.segments && contentBuilder) {
+              contentBuilder.classList.remove("hidden");
+              this.renderSegmentsList(obj);
+            }
+            return;
+          }
+
+          if (obj.customType === "qrcode") {
+            if (qrcodeGroup) qrcodeGroup.classList.remove("hidden");
+            if (appearanceGroup) appearanceGroup.classList.add("hidden");
+            editor.qrcodeProps.syncUI(obj);
+            if (obj.smartConfig && obj.smartConfig.segments && contentBuilder) {
+              contentBuilder.classList.remove("hidden");
+              this.renderSegmentsList(obj);
+            }
+            return;
+          }
+
+          if (obj.type === "textbox" || obj.type === "text") {
+            if (appearanceGroup) appearanceGroup.classList.add("hidden");
+          } else {
+            if (appearanceGroup) appearanceGroup.classList.remove("hidden");
+          }
+
+          if (obj.type === "textbox" || obj.type === "text") {
+            if (fontSettings) fontSettings.classList.remove("hidden");
+            document.getElementById("prop-font-family").value = obj.fontFamily;
+            document.getElementById("prop-font-size").value = obj.fontSize;
+            document.getElementById("prop-line-height").value = obj.lineHeight || 1.16;
+            document.getElementById("prop-char-spacing").value = (obj.charSpacing || 0) / 50;
+            document.getElementById("prop-text-color").value = obj.fill;
+            document.getElementById("prop-text-bg").value = obj.backgroundColor || "#ffffff";
+            const updateBtn = (id, active) => {
+              const btn = document.getElementById(id);
+              if (btn) active ? btn.classList.add("active") : btn.classList.remove("active");
+            };
+            updateBtn("btn-bold", obj.fontWeight === "bold");
+            updateBtn("btn-italic", obj.fontStyle === "italic");
+            updateBtn("btn-underline", obj.underline);
+            updateBtn("btn-linethrough", obj.linethrough);
+            updateBtn("btn-align-left", obj.textAlign === "left");
+            updateBtn("btn-align-center", obj.textAlign === "center");
+            updateBtn("btn-align-right", obj.textAlign === "right");
+            updateBtn("btn-align-justify", obj.textAlign === "justify");
+          }
+
+          if (obj.smartConfig && obj.smartConfig.segments && contentBuilder) {
+            contentBuilder.classList.remove("hidden");
+            this.renderSegmentsList(obj);
+          }
+        },
+        renderSegmentsList: function (obj) {
+          const container = document.getElementById("segments-container");
+          if (!container) return;
+          container.innerHTML = "";
+          obj.smartConfig.segments.forEach((seg, index) => {
+            const div = document.createElement("div");
+            div.className = "segment-item bg-white border border-gray-200 rounded-lg p-2.5 flex flex-col gap-2.5 shadow-sm relative group mb-2 hover:border-blue-300 transition-colors";
+            div.draggable = true;
+            div.addEventListener("dragstart", (e) => {
+              editor.state.draggedSegmentIndex = index;
+              div.classList.add("dragging");
+            });
+            div.addEventListener("dragend", () => div.classList.remove("dragging"));
+            div.addEventListener("dragover", (e) => e.preventDefault());
+            div.addEventListener("drop", () => editor.ui.moveSegment(editor.state.draggedSegmentIndex, index));
+
+            let typeOptions = "";
+            editor.builder.types.forEach((t) => (typeOptions += `<option value="${t.val}" ${seg.type === t.val ? "selected" : ""}>${t.label}</option>`));
+
+            let controlsHtml = "";
+            if (seg.type === "variable") {
+              let opts = "";
+              const vars = editor.variables.getAll();
+              if (vars.length === 0) {
+                controlsHtml = `<div class="text-[10px] text-red-500 bg-red-50 p-1.5 rounded border border-red-100">请先在"变量"面板添加变量</div>`;
+              } else {
+                vars.forEach((v) => { opts += `<option value="${v.name}" ${seg.value === v.name ? "selected" : ""}>${v.name}</option>`; });
+                // 专属紫色主题下拉框 + 自定义紫色箭头
+                controlsHtml = `<select oninput="editor.ui.updateSegment(${index}, 'value', this.value)" class="w-full appearance-none border border-purple-200 rounded-md pl-2.5 pr-7 py-1.5 text-xs bg-purple-50 text-purple-700 font-bold outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 transition-all cursor-pointer shadow-sm bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239333ea%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3e%3cpolyline points=%226 9 12 15 18 9%22%3e%3c/polyline%3e%3c/svg%3e')] bg-[length:14px_14px] bg-[right_8px_center] bg-no-repeat">${opts}</select>`;
+              }
+            } else if (seg.type === "datasource") {
+              let opts = "";
+              editor.state.headers.forEach((h) => (opts += `<option value="${h}" ${seg.value === h ? "selected" : ""}>${h}</option>`));
+              // 专属蓝色主题下拉框 + 自定义蓝色箭头
+              controlsHtml = `<select oninput="editor.ui.updateSegment(${index}, 'value', this.value)" class="w-full appearance-none border border-blue-200 rounded-md pl-2.5 pr-7 py-1.5 text-xs bg-blue-50 text-blue-700 font-bold outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer shadow-sm bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%232563eb%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3e%3cpolyline points=%226 9 12 15 18 9%22%3e%3c/polyline%3e%3c/svg%3e')] bg-[length:14px_14px] bg-[right_8px_center] bg-no-repeat">${opts || "<option>请先加载数据源</option>"}</select>`;
+            } else if (seg.type === "serial") {
+              // 专属绿色获得焦点态 + 清晰表单排版
+              controlsHtml = `
+                            <div class="grid grid-cols-2 gap-2">
+                                <div class="flex flex-col gap-1">
+                                    <label class="text-[10px] text-gray-500 font-medium">起始值</label>
+                                    <input type="number" value="${seg.value}" oninput="editor.ui.updateSegment(${index}, 'value', this.value)" class="border border-gray-200 rounded-md px-2 py-1.5 text-xs focus:border-green-400 focus:ring-2 focus:ring-green-100 outline-none transition-all shadow-sm">
+                                </div>
+                                <div class="flex flex-col gap-1">
+                                    <label class="text-[10px] text-gray-500 font-medium">方向</label>
+                                    <select onchange="editor.ui.updateSegment(${index}, 'direction', this.value)" class="appearance-none border border-gray-200 rounded-md pl-2 pr-6 py-1.5 text-xs focus:border-green-400 focus:ring-2 focus:ring-green-100 outline-none bg-white cursor-pointer transition-all shadow-sm bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2364748b%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3e%3cpolyline points=%226 9 12 15 18 9%22%3e%3c/polyline%3e%3c/svg%3e')] bg-[length:12px_12px] bg-[right_6px_center] bg-no-repeat">
+                                        <option value="inc" ${seg.direction !== "dec" ? "selected" : ""}>递增</option>
+                                        <option value="dec" ${seg.direction === "dec" ? "selected" : ""}>递减</option>
+                                    </select>
+                                </div>
+                                <div class="flex flex-col gap-1">
+                                    <label class="text-[10px] text-gray-500 font-medium">步长</label>
+                                    <input type="number" value="${seg.step || 1}" oninput="editor.ui.updateSegment(${index}, 'step', this.value)" class="border border-gray-200 rounded-md px-2 py-1.5 text-xs focus:border-green-400 focus:ring-2 focus:ring-green-100 outline-none transition-all shadow-sm">
+                                </div>
+                                <div class="flex flex-col gap-1">
+                                    <label class="text-[10px] text-gray-500 font-medium">重复(次)</label>
+                                    <input type="number" value="${seg.repeat || 1}" oninput="editor.ui.updateSegment(${index}, 'repeat', this.value)" class="border border-gray-200 rounded-md px-2 py-1.5 text-xs focus:border-green-400 focus:ring-2 focus:ring-green-100 outline-none transition-all shadow-sm">
+                                </div>
+                            </div>`;
+            } else if (seg.type !== "date" && seg.type !== "time") {
+              controlsHtml = `<textarea oninput="editor.ui.updateSegment(${index}, 'value', this.value)" class="w-full border border-gray-200 rounded-md px-2.5 py-2 text-xs focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none resize-y min-h-[50px] bg-gray-50 focus:bg-white transition-all shadow-sm" placeholder="输入固定文本...">${seg.value}</textarea>`;
+            } else {
+              controlsHtml = `<div class="text-[10px] text-gray-500 bg-gray-50 border border-gray-200 px-2 py-2 rounded-md flex items-center justify-center font-medium"><i class="fa-regular fa-clock mr-1.5"></i> 自动使用系统${seg.type === "date" ? "日期" : "时间"}</div>`;
+            }
+
+            div.innerHTML = `
+                        <div class="flex justify-between items-center text-xs text-gray-500 border-b border-gray-100 pb-2">
+                            <div class="flex items-center gap-1.5 cursor-move">
+                                <i class="fa-solid fa-grip-vertical text-gray-300 hover:text-gray-500 p-1 transition-colors"></i>
+                                <select onchange="editor.ui.updateSegment(${index}, 'type', this.value)" class="appearance-none bg-gray-100 hover:bg-gray-200 border border-transparent rounded px-2 pr-6 py-1 text-[11px] font-bold text-gray-700 outline-none cursor-pointer transition-colors shadow-sm bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2364748b%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3e%3cpolyline points=%226 9 12 15 18 9%22%3e%3c/polyline%3e%3c/svg%3e')] bg-[length:12px_12px] bg-[right_6px_center] bg-no-repeat">${typeOptions}</select>
+                            </div>
+                            <button onclick="editor.ui.removeSegment(${index})" class="text-gray-400 hover:text-red-500 bg-white hover:bg-red-50 p-1.5 rounded transition-colors"><i class="fa-solid fa-trash-can"></i></button>
+                        </div>
+                        <div class="pt-1">${controlsHtml}</div>`;
+            container.appendChild(div);
+          });
+        },
+        addSegment: async function (type) {
+          const obj = editor.canvas.getActiveObject();
+          if (!obj) return;
+          let val = "";
+          let defaults = {};
+          if (type === "variable") val = editor.variables.getAll()[0]?.name || "变量1";
+          if (type === "datasource") val = editor.state.headers[0] || "Unknown";
+          if (type === "serial") {
+            val = "1001";
+            defaults = { step: 1, repeat: 1, direction: "inc" };
+          }
+          if (type === "fixed") val = "新文本";
+          obj.smartConfig.segments.push({ type: type, value: val, ...defaults });
+          await editor.builder.refreshObjectText(obj, editor.state.dataRows[0]);
+          this.renderSegmentsList(obj);
+          editor.canvas.requestRenderAll();
+        },
+        removeSegment: async function (index) {
+          const obj = editor.canvas.getActiveObject();
+          if (!obj) return;
+          obj.smartConfig.segments.splice(index, 1);
+          await editor.builder.refreshObjectText(obj, editor.state.dataRows[0]);
+          this.renderSegmentsList(obj);
+          editor.canvas.requestRenderAll();
+        },
+        updateSegment: async function (index, key, val) {
+          const obj = editor.canvas.getActiveObject();
+          if (!obj) return;
+          if (key === "type") {
+            obj.smartConfig.segments[index].type = val;
+            if (val === "variable") obj.smartConfig.segments[index].value = editor.variables.getAll()[0]?.name || "";
+            else if (val === "datasource") obj.smartConfig.segments[index].value = editor.state.headers[0] || "";
+            else if (val === "serial") {
+              obj.smartConfig.segments[index].value = "1";
+              obj.smartConfig.segments[index].step = 1;
+            }
+          } else {
+            obj.smartConfig.segments[index][key] = val;
+          }
+          await editor.builder.refreshObjectText(obj, editor.state.dataRows[0]);
+          if (key === "type") this.renderSegmentsList(editor.canvas.getActiveObject());
+          editor.canvas.requestRenderAll();
+        },
+        moveSegment: async function (from, to) {
+          const obj = editor.canvas.getActiveObject();
+          if (!obj || from === null) return;
+          const item = obj.smartConfig.segments.splice(from, 1)[0];
+          obj.smartConfig.segments.splice(to, 0, item);
+          await editor.builder.refreshObjectText(obj, editor.state.dataRows[0]);
+          this.renderSegmentsList(obj);
+          editor.canvas.requestRenderAll();
+        },
+      },
+
+      utils: {
+        mmToPx: (mm) => mm * 3.7795,
+        pxToMm: (px) => px / 3.7795,
+        rafThrottle: function (fn) {
+          let ticking = false;
+          return function (...args) {
+            if (!ticking) {
+              window.requestAnimationFrame(() => {
+                fn.apply(this, args);
+                ticking = false;
+              });
+              ticking = true;
+            }
+          };
+        },
+        renderBarcodeVector: function (value, cfg, targetGroup) {
+          const format = cfg.format || "CODE128";
+          const lineColor = cfg.lineColor || "#000000";
+          const bgColor = cfg.bgColor || "#ffffff";
+          const barHeight = cfg.barHeight || 60;
+          const barWidth = cfg.barWidth || 2;
+          const showText = cfg.showText !== false;
+          const fontSize = cfg.fontSize || 14;
+          const textPos = cfg.textPosition || "bottom";
+          const textAlign = cfg.textAlign || "center";
+          const textGap = cfg.textGap !== undefined ? cfg.textGap : 2;
+
+          const tmpCanvas = document.createElement("canvas");
+          let barsBin = [];
+          let totalBarPx = 0;
+          let isValid = true;
+          try {
+            JsBarcode(tmpCanvas, value || "12345678", {
+              format: format,
+              width: 1,
+              height: 10,
+              displayValue: false,
+              margin: 0,
+              lineColor: "#000000",
+              background: "#ffffff",
+              valid: function (validStatus) {
+                isValid = validStatus;
+              },
+            });
+          } catch (e) {
+            isValid = false;
+          }
+          if (!isValid) {
+            const safeStr = "无效内容 / Invalid Data";
+            const textH = showText ? fontSize + 4 : 0;
+            const totalH = barHeight + textH;
+            const canvasW = Math.max(140, safeStr.length * 8);
+            const objs = [];
+            objs.push(new fabric.Rect({ left: 0, top: 0, width: canvasW, height: totalH, fill: "#fee2e2", strokeWidth: 0, selectable: false, evented: false }));
+            objs.push(
+              new fabric.Text(safeStr, {
+                left: canvasW / 2,
+                top: totalH / 2,
+                fontSize: 12,
+                fill: "#ef4444",
+                fontFamily: "Arial",
+                originX: "center",
+                originY: "center",
+                selectable: false,
+                evented: false,
+              }),
+            );
+            const _cx = canvasW / 2,
+              _cy = totalH / 2;
+            objs.forEach((o) => {
+              o.left -= _cx;
+              o.top -= _cy;
+            });
+            const group = new fabric.Group(objs, {
+              left: targetGroup ? targetGroup.left : 50,
+              top: targetGroup ? targetGroup.top : 50,
+              angle: targetGroup ? targetGroup.angle || 0 : 0,
+              scaleX: targetGroup ? targetGroup.scaleX || 1 : 1,
+              scaleY: targetGroup ? targetGroup.scaleY || 1 : 1,
+              originX: "left",
+              originY: "top",
+              subTargetCheck: false,
+            });
+            group.customType = "barcode";
+            group.barcodeConfig = Object.assign({}, cfg, { format });
+            return group;
+          }
+
+          const ctx = tmpCanvas.getContext("2d");
+          const w = tmpCanvas.width;
+          const imgData = ctx.getImageData(0, 0, w, 1).data;
+          let prev = null,
+            count = 0;
+          for (let x = 0; x < w; x++) {
+            const r = imgData[x * 4];
+            const a = imgData[x * 4 + 3];
+            const isDark = a > 0 && r < 128;
+            if (prev === null) {
+              prev = isDark;
+              count = 1;
+            } else if (isDark === prev) {
+              count++;
+            } else {
+              barsBin.push({ dark: prev, width: count });
+              totalBarPx += count;
+              prev = isDark;
+              count = 1;
+            }
+          }
+          if (prev !== null) {
+            barsBin.push({ dark: prev, width: count });
+            totalBarPx += count;
+          }
+          if (!barsBin.length) return null;
+
+          const scale = barWidth;
+          const scaledW = Math.round(totalBarPx * scale);
+          const textH = showText ? fontSize + textGap : 0;
+          const totalH = barHeight + textH;
+          const canvasW = scaledW;
+          const barOffsetY = textPos === "top" ? textH : 0;
+          const objs = [];
+          objs.push(new fabric.Rect({ left: 0, top: 0, width: canvasW, height: totalH, fill: bgColor, strokeWidth: 0, selectable: false, evented: false }));
+          let curX = 0;
+          barsBin.forEach((b) => {
+            const bw = Math.max(1, Math.round(b.width * scale));
+            if (b.dark) objs.push(new fabric.Rect({ left: curX, top: barOffsetY, width: bw, height: barHeight, fill: lineColor, strokeWidth: 0, selectable: false, evented: false }));
+            curX += bw;
+          });
+          if (showText) {
+            const textY = textPos === "top" ? 0 : barHeight + textGap;
+            const textX = textAlign === "center" ? canvasW / 2 : textAlign === "right" ? canvasW : 0;
+            objs.push(
+              new fabric.Text(value, {
+                left: textX,
+                top: textY,
+                fontSize,
+                fill: lineColor,
+                fontFamily: "Arial",
+                originX: textAlign === "center" ? "center" : textAlign === "right" ? "right" : "left",
+                selectable: false,
+                evented: false,
+              }),
+            );
+          }
+          const _cx = canvasW / 2,
+            _cy = totalH / 2;
+          objs.forEach((o) => {
+            o.left -= _cx;
+            o.top -= _cy;
+          });
+          const group = new fabric.Group(objs, {
+            left: targetGroup ? targetGroup.left : 50,
+            top: targetGroup ? targetGroup.top : 50,
+            angle: targetGroup ? targetGroup.angle || 0 : 0,
+            scaleX: targetGroup ? targetGroup.scaleX || 1 : 1,
+            scaleY: targetGroup ? targetGroup.scaleY || 1 : 1,
+            originX: "left",
+            originY: "top",
+            subTargetCheck: false,
+          });
+          group.customType = "barcode";
+          group.barcodeConfig = Object.assign({}, cfg, { format });
+          return group;
+        },
+        renderCodeVector: function (value, cfg, targetGroup) {
+          const codeType = (cfg.codeType || "qr").toLowerCase();
+          if (codeType === "qr" || codeType === "micro_qr" || codeType === "microqr") return this._renderQR(value, cfg, targetGroup);
+          return this._renderMatrix2D(value, Object.assign({}, cfg, { codeType }), targetGroup);
+        },
+        _renderQR: function (value, cfg, targetGroup) {
+          const ecLevel = cfg.ecLevel || "M";
+          const isMicro = (cfg.codeType || "").toLowerCase() === "micro_qr";
+          const safeEc = isMicro ? (["L", "M"].includes(ecLevel) ? ecLevel : "M") : ecLevel;
+          let matrix = [],
+            moduleCount = 0;
+          try {
+            const typeNum = isMicro ? "M2" : 0;
+            const qr = qrcode(typeNum, safeEc);
+            qr.addData(String(value || (isMicro ? "01" : "https://example.com")));
+            qr.make();
+            moduleCount = qr.getModuleCount();
+            for (let r = 0; r < moduleCount; r++) {
+              matrix.push([]);
+              for (let c = 0; c < moduleCount; c++) matrix[r].push(qr.isDark(r, c));
+            }
+          } catch (e) {
+            try {
+              const qr2 = qrcode(0, safeEc);
+              qr2.addData(String(value || "https://example.com"));
+              qr2.make();
+              moduleCount = qr2.getModuleCount();
+              matrix = [];
+              for (let r = 0; r < moduleCount; r++) {
+                matrix.push([]);
+                for (let c = 0; c < moduleCount; c++) matrix[r].push(qr2.isDark(r, c));
+              }
+            } catch (e2) {
+              return null;
+            }
+          }
+          return this._buildMatrixGroup(matrix, moduleCount, cfg, targetGroup, value);
+        },
+        _renderMatrix2D: function (value, cfg, targetGroup) {
+          const codeType = (cfg.codeType || "qr").toLowerCase();
+          let matrix = [],
+            moduleCount = 0;
+          let patchedCfg = Object.assign({}, cfg);
+          try {
+            if (codeType === "datamatrix") {
+              const qr = qrcode(0, "H");
+              qr.addData(value || "DATA");
+              qr.make();
+              moduleCount = qr.getModuleCount();
+              for (let r = 0; r < moduleCount; r++) {
+                matrix.push([]);
+                for (let c = 0; c < moduleCount; c++) matrix[r].push(qr.isDark(r, c));
+              }
+              for (let i = 0; i < moduleCount; i++) {
+                matrix[i][0] = true;
+                matrix[moduleCount - 1][i] = true;
+                matrix[0][i] = i % 2 === 0;
+                matrix[i][moduleCount - 1] = i % 2 !== 0;
+              }
+            } else if (codeType === "pdf417") {
+              const qr = qrcode(0, "M");
+              qr.addData(value || "PDF417");
+              qr.make();
+              const qrMods = qr.getModuleCount();
+              moduleCount = qrMods;
+              for (let r = 0; r < qrMods; r++) {
+                matrix.push([]);
+                for (let c = 0; c < qrMods; c++) matrix[r].push(qr.isDark(r, c));
+              }
+              patchedCfg._cellW = (3 * (cfg._cellW || 8)) / 8;
+              patchedCfg._cellH = Math.max(3, (cfg._cellH || 8) / 2);
+            } else if (codeType === "aztec") {
+              const qr = qrcode(0, "L");
+              qr.addData(value || "AZTEC");
+              qr.make();
+              moduleCount = qr.getModuleCount();
+              for (let r = 0; r < moduleCount; r++) {
+                matrix.push([]);
+                for (let c = 0; c < moduleCount; c++) matrix[r].push(qr.isDark(r, c));
+              }
+              const mid = Math.floor(moduleCount / 2);
+              for (let ring = 1; ring <= 4; ring += 2) {
+                for (let i = mid - ring; i <= mid + ring; i++) {
+                  for (let j = mid - ring; j <= mid + ring; j++) {
+                    if (i < 0 || i >= moduleCount || j < 0 || j >= moduleCount) continue;
+                    if (i === mid - ring || i === mid + ring || j === mid - ring || j === mid + ring) matrix[i][j] = true;
+                  }
+                }
+              }
+              for (let ring = 2; ring <= 3; ring += 2) {
+                for (let i = mid - ring; i <= mid + ring; i++) {
+                  for (let j = mid - ring; j <= mid + ring; j++) {
+                    if (i < 0 || i >= moduleCount || j < 0 || j >= moduleCount) continue;
+                    if (i === mid - ring || i === mid + ring || j === mid - ring || j === mid + ring) matrix[i][j] = false;
+                  }
+                }
+              }
+            } else {
+              return this._renderQR(value, cfg, targetGroup);
+            }
+          } catch (e) {
+            return this._renderQR(value, Object.assign({}, cfg, { codeType: "qr" }), targetGroup);
+          }
+          return this._buildMatrixGroup(matrix, moduleCount, patchedCfg, targetGroup, value);
+        },
+        _buildMatrixGroup: function (matrix, moduleCount, cfg, targetGroup, value) {
+          const darkColor = cfg.darkColor || "#000000";
+          const lightColor = cfg.lightColor || "#ffffff";
+          const moduleStyle = cfg.moduleStyle || "square";
+          const showText = cfg.showText || false;
+          const fontSize = cfg.fontSize || 12;
+          const fontColor = cfg.fontColor || "#000000";
+          const textGap = cfg.textGap !== undefined ? cfg.textGap : 3;
+          const baseCell = cfg.cellSize || cfg._cellW || 8;
+          const cellW = cfg._cellW || baseCell;
+          const cellH = cfg._cellH || baseCell;
+          const totalMod = moduleCount;
+          const sizeW = totalMod * cellW;
+          const sizeH = totalMod * cellH;
+          const textH = showText ? fontSize + textGap : 0;
+          const objs = [];
+          objs.push(new fabric.Rect({ left: 0, top: 0, width: sizeW, height: sizeH + textH, fill: lightColor, strokeWidth: 0, selectable: false, evented: false }));
+          for (let r = 0; r < moduleCount; r++) {
+            for (let c = 0; c < moduleCount; c++) {
+              if (matrix[r] && matrix[r][c]) {
+                const x = c * cellW;
+                const y = r * cellH;
+                if (moduleStyle === "dot")
+                  objs.push(
+                    new fabric.Circle({ left: x + cellW * 0.05, top: y + cellH * 0.05, radius: Math.min(cellW, cellH) * 0.45, fill: darkColor, strokeWidth: 0, selectable: false, evented: false }),
+                  );
+                else if (moduleStyle === "round")
+                  objs.push(
+                    new fabric.Rect({
+                      left: x + 0.5,
+                      top: y + 0.5,
+                      width: cellW - 1,
+                      height: cellH - 1,
+                      rx: Math.min(cellW, cellH) * 0.3,
+                      ry: Math.min(cellW, cellH) * 0.3,
+                      fill: darkColor,
+                      strokeWidth: 0,
+                      selectable: false,
+                      evented: false,
+                    }),
+                  );
+                else objs.push(new fabric.Rect({ left: x, top: y, width: cellW, height: cellH, fill: darkColor, strokeWidth: 0, selectable: false, evented: false }));
+              }
+            }
+          }
+          if (showText)
+            objs.push(new fabric.Text(value, { left: sizeW / 2, top: sizeH + textGap, fontSize, fill: fontColor, fontFamily: "Arial", originX: "center", selectable: false, evented: false }));
+          const _cxQ = sizeW / 2,
+            _cyQ = (sizeH + textH) / 2;
+          objs.forEach((o) => {
+            o.left -= _cxQ;
+            o.top -= _cyQ;
+          });
+          const group = new fabric.Group(objs, {
+            left: targetGroup ? targetGroup.left : 50,
+            top: targetGroup ? targetGroup.top : 50,
+            angle: targetGroup ? targetGroup.angle || 0 : 0,
+            scaleX: targetGroup ? targetGroup.scaleX || 1 : 1,
+            scaleY: targetGroup ? targetGroup.scaleY || 1 : 1,
+            originX: "left",
+            originY: "top",
+            subTargetCheck: false,
+          });
+          group.customType = "qrcode";
+          group.qrcodeConfig = Object.assign({}, cfg);
+          return group;
+        },
+      },
+
+      barcodeProps: {
+        update: function (key, val) {
+          const obj = editor.canvas.getActiveObject();
+          if (!obj || obj.customType !== "barcode") return;
+          obj.barcodeConfig = obj.barcodeConfig || {};
+          obj.barcodeConfig[key] = val;
+          if (key === "showText") {
+            document.getElementById("bc-text-opts").style.display = val ? "" : "none";
+          }
+          editor.builder.refreshObjectText(obj, editor.state.dataRows[0]).then(() => {
+            editor.canvas.requestRenderAll();
+          });
+        },
+        syncUI: function (obj) {
+          const cfg = obj.barcodeConfig || {};
+          const setVal = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.value = val;
+          };
+          const setChk = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.checked = !!val;
+          };
+          setVal("bc-format", cfg.format || "CODE128");
+          setVal("bc-linecolor", cfg.lineColor || "#000000");
+          setVal("bc-bgcolor", cfg.bgColor || "#ffffff");
+          setVal("bc-height", cfg.barHeight || 60);
+          setVal("bc-width", cfg.barWidth || 2);
+          setChk("bc-showtext", cfg.showText !== false);
+          setVal("bc-fontsize", cfg.fontSize || 14);
+          setVal("bc-textpos", cfg.textPosition || "bottom");
+          setVal("bc-textalign", cfg.textAlign || "center");
+          setVal("bc-textgap", cfg.textGap !== undefined ? cfg.textGap : 2);
+          document.getElementById("bc-text-opts").style.display = cfg.showText !== false ? "" : "none";
+        },
+      },
+
+      qrcodeProps: {
+        update: function (key, val) {
+          const obj = editor.canvas.getActiveObject();
+          if (!obj || obj.customType !== "qrcode") return;
+          obj.qrcodeConfig = obj.qrcodeConfig || {};
+          obj.qrcodeConfig[key] = val;
+          if (key === "showText") document.getElementById("qr-text-opts").classList.toggle("hidden", !val);
+          if (key === "codeType") {
+            const noEc = ["datamatrix", "code49"].includes(val);
+            const ecRow = document.getElementById("qr-eclevel-row");
+            if (ecRow) ecRow.style.display = noEc ? "none" : "";
+          }
+          editor.builder.refreshObjectText(obj, editor.state.dataRows[0]).then(() => {
+            editor.canvas.requestRenderAll();
+          });
+        },
+        syncUI: function (obj) {
+          const cfg = obj.qrcodeConfig || {};
+          const setVal = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.value = val;
+          };
+          const setChk = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.checked = !!val;
+          };
+          setVal("qr-codetype", cfg.codeType || "qr");
+          setVal("qr-eclevel", cfg.ecLevel || "M");
+          setVal("qr-darkcolor", cfg.darkColor || "#000000");
+          setVal("qr-lightcolor", cfg.lightColor || "#ffffff");
+          setVal("qr-style", cfg.moduleStyle || "square");
+          setVal("qr-cellsize", cfg.cellSize || 8);
+          setChk("qr-showtext", cfg.showText || false);
+          setVal("qr-fontsize", cfg.fontSize || 12);
+          setVal("qr-fontcolor", cfg.fontColor || "#000000");
+          setVal("qr-textgap", cfg.textGap !== undefined ? cfg.textGap : 3);
+          document.getElementById("qr-text-opts").classList.toggle("hidden", !cfg.showText);
+          const noEc = ["datamatrix", "code49"].includes(cfg.codeType);
+          const ecRow = document.getElementById("qr-eclevel-row");
+          if (ecRow) ecRow.style.display = noEc ? "none" : "";
+        },
+      },
+
+      variables: {
+        add: function () {
+          editor.state.variables.push({ id: "var_" + Date.now(), name: "变量" + (editor.state.variables.length + 1), value: "默认值" });
+          editor.ui.renderVariables();
+        },
+        remove: function (id) {
+          editor.state.variables = editor.state.variables.filter((v) => v.id !== id);
+          editor.ui.renderVariables();
+          editor.builder.refreshAllText();
+        },
+        update: function (id, key, val) {
+          const v = editor.state.variables.find((v) => v.id === id);
+          if (v) {
+            v[key] = val;
+            editor.builder.refreshAllText();
+          }
+        },
+        getAll: () => editor.state.variables,
+        getValue: (name) => {
+          const v = editor.state.variables.find((v) => v.name === name);
+          return v ? v.value : name;
+        },
+      },
+
+      bindPropsEvents: function () {
+        this.canvas.on("selection:created", () => {
+          if (!this.state.suppressSelectionEvent) this.handleSelection(true);
+        });
+        this.canvas.on("selection:updated", () => {
+          if (!this.state.suppressSelectionEvent) this.handleSelection(true);
+        });
+        this.canvas.on("selection:cleared", () => {
+          if (!this.state.suppressSelectionEvent) this.handleSelection(false);
+        });
+
+        const onTransform = this.utils.rafThrottle((e) => {
+          if (e.target) this.ui.syncTransformProps(e.target);
+        });
+        this.canvas.on("object:moving", onTransform);
+        this.canvas.on("object:scaling", onTransform);
+        this.canvas.on("object:rotating", onTransform);
+        ["left", "top", "width", "height", "angle"].forEach((k) => {
+          const el = document.getElementById(`prop-${k}`);
+          if (el) {
+            el.addEventListener("input", (e) => {
+              const o = this.canvas.getActiveObject();
+              if (!o) return;
+              let v = parseFloat(e.target.value);
+              if (isNaN(v)) return;
+              if (k === "width" || k === "height") v = Math.max(0.1, v);
+              if (k === "angle") {
+                const origOriginX = o.originX;
+                const origOriginY = o.originY;
+                const center = o.getCenterPoint();
+                o.set({ originX: "center", originY: "center", left: center.x, top: center.y });
+                o.set("angle", v);
+                o.set({ originX: origOriginX, originY: origOriginY });
+                o.setPositionByOrigin(center, "center", "center");
+              } else if (["left", "top"].includes(k)) {
+                o.set(k, this.utils.mmToPx(v));
+              } else if (k === "width") {
+                const pxVal = this.utils.mmToPx(v);
+                if (o.type === "rect") o.set("width", pxVal / o.scaleX);
+                else o.set("scaleX", pxVal / (o.width || 1));
+              } else if (k === "height") {
+                if (o.type === "line") return;
+                const pxVal = this.utils.mmToPx(v);
+                if (o.type === "rect") o.set("height", pxVal / o.scaleY);
+                else o.set("scaleY", pxVal / (o.height || 1));
+              }
+              o.setCoords();
+              this.canvas.requestRenderAll();
+            });
+          }
+        });
+
+        const fillTypeEl = document.getElementById("prop-fill-type");
+        if (fillTypeEl) {
+          fillTypeEl.addEventListener("change", (e) => {
+            const o = this.canvas.getActiveObject();
+            if (!o) return;
+            const colorInput = document.getElementById("prop-fill");
+            if (e.target.value === "none") {
+              o.set("fill", "transparent");
+              colorInput.disabled = true;
+            } else {
+              o.set("fill", colorInput.value);
+              colorInput.disabled = false;
+            }
+            this.canvas.requestRenderAll();
+          });
+        }
+        const fillEl = document.getElementById("prop-fill");
+        if (fillEl) {
+          fillEl.addEventListener("input", (e) => {
+            const o = this.canvas.getActiveObject();
+            if (o && document.getElementById("prop-fill-type").value === "solid") {
+              o.set("fill", e.target.value);
+              this.canvas.requestRenderAll();
+            }
+          });
+        }
+        const strokeEl = document.getElementById("prop-stroke");
+        if (strokeEl) {
+          strokeEl.addEventListener("input", (e) => {
+            const o = this.canvas.getActiveObject();
+            if (o) {
+              o.set("stroke", e.target.value);
+              this.canvas.requestRenderAll();
+            }
+          });
+        }
+        const strokeWidthEl = document.getElementById("prop-stroke-width");
+        if (strokeWidthEl) {
+          strokeWidthEl.addEventListener("input", (e) => {
+            const o = this.canvas.getActiveObject();
+            if (o) {
+              o.set("strokeWidth", parseFloat(e.target.value));
+              this.canvas.requestRenderAll();
+            }
+          });
+        }
+        const setStyle = (prop, val) => {
+          const o = this.canvas.getActiveObject();
+          if (o) {
+            o.set(prop, val);
+            this.canvas.requestRenderAll();
+            this.ui.renderElementProps(o);
+          }
+        };
+        if (document.getElementById("btn-bold"))
+          document.getElementById("btn-bold").onclick = () => {
+            const o = this.canvas.getActiveObject();
+            setStyle("fontWeight", o.fontWeight === "bold" ? "normal" : "bold");
+          };
+        if (document.getElementById("btn-italic"))
+          document.getElementById("btn-italic").onclick = () => {
+            const o = this.canvas.getActiveObject();
+            setStyle("fontStyle", o.fontStyle === "italic" ? "normal" : "italic");
+          };
+        if (document.getElementById("btn-underline"))
+          document.getElementById("btn-underline").onclick = () => {
+            const o = this.canvas.getActiveObject();
+            setStyle("underline", !o.underline);
+          };
+        if (document.getElementById("btn-linethrough"))
+          document.getElementById("btn-linethrough").onclick = () => {
+            const o = this.canvas.getActiveObject();
+            setStyle("linethrough", !o.linethrough);
+          };
+        if (document.getElementById("btn-align-left")) document.getElementById("btn-align-left").onclick = () => setStyle("textAlign", "left");
+        if (document.getElementById("btn-align-center")) document.getElementById("btn-align-center").onclick = () => setStyle("textAlign", "center");
+        if (document.getElementById("btn-align-right")) document.getElementById("btn-align-right").onclick = () => setStyle("textAlign", "right");
+        if (document.getElementById("btn-align-justify")) document.getElementById("btn-align-justify").onclick = () => setStyle("textAlign", "justify");
+        if (document.getElementById("prop-font-size")) document.getElementById("prop-font-size").oninput = (e) => setStyle("fontSize", parseInt(e.target.value));
+        if (document.getElementById("prop-line-height")) document.getElementById("prop-line-height").oninput = (e) => setStyle("lineHeight", parseFloat(e.target.value));
+        if (document.getElementById("prop-char-spacing")) document.getElementById("prop-char-spacing").oninput = (e) => setStyle("charSpacing", parseInt(e.target.value) * 50);
+        if (document.getElementById("prop-text-color")) document.getElementById("prop-text-color").oninput = (e) => setStyle("fill", e.target.value);
+        if (document.getElementById("prop-text-bg")) document.getElementById("prop-text-bg").oninput = (e) => setStyle("backgroundColor", e.target.value);
+      },
+
+      handleSelection: function (has) {
+        this.ui.togglePropsPanel(has);
+        if (has) this.ui.renderElementProps(this.canvas.getActiveObject());
+      },
+
+      data: { parseData: function () { } },
+
+      excelData: {
+        _workbook: null,
+        _sheetNames: [],
+        _currentSheet: "",
+        loadFile: function (input) {
+          const file = input.files && input.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              const data = new Uint8Array(e.target.result);
+              this._workbook = XLSX.read(data, { type: "array" });
+              this._sheetNames = this._workbook.SheetNames;
+              if (!this._sheetNames.length) return;
+              this._currentSheet = this._sheetNames[0];
+              this.renderSheetTabs();
+              this.loadSheet(this._currentSheet);
+              document.getElementById("sheet-selector-wrap").classList.remove("hidden");
+              document.getElementById("btn-clear-data").classList.remove("hidden");
+            } catch (err) {
+              Swal.fire({ icon: "error", title: "读取失败", text: "请确认文件格式正确 (.xlsx / .xls / .csv)" });
+            }
+          };
+          reader.readAsArrayBuffer(file);
+          input.value = "";
+        },
+        renderSheetTabs: function () {
+          const container = document.getElementById("sheet-tabs");
+          container.innerHTML = "";
+          const nonEmptySheets = this._sheetNames.filter((name) => {
+            const sheet = this._workbook.Sheets[name];
+            const ref = sheet["!ref"];
+            if (!ref) return false;
+            const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+            return data.some((row) => row.some((cell) => cell !== "" && cell !== null && cell !== undefined));
+          });
+          if (nonEmptySheets.length && !nonEmptySheets.includes(this._currentSheet)) this._currentSheet = nonEmptySheets[0];
+          nonEmptySheets.forEach((name) => {
+            const btn = document.createElement("button");
+            btn.className = "sheet-tab" + (name === this._currentSheet ? " active" : "");
+            btn.textContent = name;
+            btn.onclick = () => {
+              this._currentSheet = name;
+              this.renderSheetTabs();
+              this.loadSheet(name);
+            };
+            container.appendChild(btn);
+          });
+        },
+        loadSheet: function (sheetName) {
+          const sheet = this._workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+          if (!jsonData.length) return;
+          const headers = jsonData[0].map((h) => String(h).trim()).filter(Boolean);
+          const rows = jsonData.slice(1).filter((r) => r.some((c) => c !== "" && c !== null && c !== undefined));
+          editor.state.headers = headers;
+          editor.state.dataRows = rows.map((r) => {
+            const obj = {};
+            headers.forEach((h, i) => {
+              obj[h] = r[i] !== undefined ? String(r[i]) : "";
+            });
+            return obj;
+          });
+          document.getElementById("data-row-count").innerText = `${editor.state.dataRows.length} 行数据  ·  ${headers.length} 列`;
+          this.renderPreviewTable(headers, rows);
+          this.renderFieldChips(headers);
+          editor.builder.refreshAllText();
+          if (editor.canvas.getActiveObject()) editor.ui.renderElementProps(editor.canvas.getActiveObject());
+        },
+        renderPreviewTable: function (headers, rows) {
+          const table = document.getElementById("data-preview-table");
+          const maxCols = headers.length;
+          const previewRows = rows.slice(0, 50);
+          let html = "<thead><tr>";
+          html += '<th class="text-gray-400 font-normal">#</th>';
+          headers.forEach((h) => {
+            html += `<th>${h}</th>`;
+          });
+          html += "</tr></thead><tbody>";
+          previewRows.forEach((r, i) => {
+            html += `<tr><td class="text-gray-300">${i + 1}</td>`;
+            for (let c = 0; c < maxCols; c++) {
+              const val = r[c] !== undefined ? String(r[c]) : "";
+              html += `<td title="${val}">${val}</td>`;
+            }
+            html += "</tr>";
+          });
+          if (rows.length > 50) html += `<tr><td colspan="${maxCols + 1}" class="text-center text-gray-400 py-2">... 仅预览前 50 行，共 ${rows.length} 行</td></tr>`;
+          html += "</tbody>";
+          table.innerHTML = html;
+        },
+        renderFieldChips: function (headers) {
+          const wrap = document.getElementById("field-chip-wrap");
+          const chips = document.getElementById("field-chips");
+          if (!headers.length) {
+            wrap.classList.add("hidden");
+            return;
+          }
+          wrap.classList.remove("hidden");
+          chips.innerHTML = "";
+          headers.forEach((h) => {
+            const item = document.createElement("div");
+            item.className = "field-drag-item";
+            item.draggable = true;
+            item.dataset.field = h;
+            item.innerHTML = `<i class="fa-solid fa-database text-blue-400 text-[10px]"></i><span class="flex-1 truncate">${h}</span><i class="fa-solid fa-plus text-[10px] text-blue-300 ml-1"></i>`;
+            item.title = `拖到画布 或 点击插入字段: ${h}`;
+            item.onclick = () => {
+              const active = editor.canvas.getActiveObject();
+              if (active && active.smartConfig) {
+                active.smartConfig.segments.push({ type: "datasource", value: h });
+                editor.ui.renderElementProps(active);
+                editor.builder.refreshObjectText(active, editor.state.dataRows[0]).then(() => editor.canvas.requestRenderAll());
+              } else {
+                const obj = new fabric.Text(`[${h}]`, { left: 50, top: 50, fontSize: 20, fontFamily: "Arial" });
+                obj.smartConfig = { segments: [{ type: "datasource", value: h }] };
+                editor.canvas.add(obj);
+                editor.canvas.setActiveObject(obj);
+                editor.builder.refreshObjectText(obj, editor.state.dataRows[0]).then(() => editor.canvas.requestRenderAll());
+              }
+              Swal.fire({ toast: true, position: "top-end", icon: "success", title: `已插入字段: ${h}`, showConfirmButton: false, timer: 1000 });
+            };
+            item.addEventListener("dragstart", (e) => {
+              e.dataTransfer.setData("text/field-name", h);
+              item.classList.add("dragging-field");
+            });
+            item.addEventListener("dragend", () => item.classList.remove("dragging-field"));
+            chips.appendChild(item);
+          });
+          editor.excelData._initCanvasDrop();
+        },
+        _initCanvasDrop: function () {
+          if (this._dropInited) return;
+          this._dropInited = true;
+          const ws = document.getElementById("workspace-container");
+          ws.addEventListener("dragover", (e) => {
+            if (e.dataTransfer.types.includes("text/field-name")) {
+              e.preventDefault();
+              ws.classList.add("field-drop-target");
+            }
+          });
+          ws.addEventListener("dragleave", () => ws.classList.remove("field-drop-target"));
+          ws.addEventListener("drop", (e) => {
+            ws.classList.remove("field-drop-target");
+            const fieldName = e.dataTransfer.getData("text/field-name");
+            if (!fieldName) return;
+            e.preventDefault();
+            const canvasEl = document.getElementById("c");
+            const rect = canvasEl.getBoundingClientRect();
+            const zoom = editor.state.viewZoom;
+            const canvasX = (e.clientX - rect.left) / zoom;
+            const canvasY = (e.clientY - rect.top) / zoom;
+            const obj = new fabric.Text(`[${fieldName}]`, { left: canvasX, top: canvasY, fontSize: 20, fontFamily: "Arial", originX: "center", originY: "center" });
+            obj.smartConfig = { segments: [{ type: "datasource", value: fieldName }] };
+            editor.canvas.add(obj);
+            editor.canvas.setActiveObject(obj);
+            editor.builder.refreshObjectText(obj, editor.state.dataRows[0]).then(() => editor.canvas.requestRenderAll());
+          });
+        },
+        clearData: function () {
+          this._workbook = null;
+          this._sheetNames = [];
+          this._currentSheet = "";
+          editor.state.headers = [];
+          editor.state.dataRows = [];
+          document.getElementById("sheet-selector-wrap").classList.add("hidden");
+          document.getElementById("field-chip-wrap").classList.add("hidden");
+          document.getElementById("btn-clear-data").classList.add("hidden");
+          document.getElementById("data-row-count").innerText = "0 行数据";
+          editor.builder.refreshAllText();
+        },
+      },
+
+      print: {
+        _currentTab: "single",
+        switchPreviewTab: function (tab) {
+          this._currentTab = tab;
+          const isSingle = tab === "single";
+          document.getElementById("tab-single-preview").classList.toggle("active", isSingle);
+          document.getElementById("tab-layout-preview").classList.toggle("active", !isSingle);
+          document.getElementById("panel-single-preview").classList.toggle("hidden", !isSingle);
+          document.getElementById("panel-layout-preview").classList.toggle("hidden", isSingle);
+          document.getElementById("single-nav").classList.toggle("hidden", !isSingle);
+          document.getElementById("layout-nav").classList.toggle("hidden", isSingle);
+          if (!isSingle) this.renderLayoutPreview();
+        },
+        renderLayoutPreview: async function () {
+          const container = document.getElementById("layout-preview-pages");
+          container.innerHTML = '<div class="text-gray-400 text-sm py-8">正在生成排版预览...</div>';
+          const p = editor.state.paper;
+          const lblW = editor.state.widthMm;
+          const lblH = editor.state.heightMm;
+          const pdfW = p.matchLabel ? lblW : p.width;
+          const pdfH = p.matchLabel ? lblH : p.height;
+          const startX = p.matchLabel ? 0 : p.marginLeft;
+          const startY = p.matchLabel ? 0 : p.marginTop;
+          const gapX = p.matchLabel ? 0 : p.gapX;
+          const gapY = p.matchLabel ? 0 : p.gapY;
+          let cols = 1,
+            rowsPerPage = 1;
+          if (!p.matchLabel) {
+            cols = Math.max(1, Math.floor((pdfW - startX) / (lblW + gapX)));
+            rowsPerPage = Math.max(1, Math.floor((pdfH - startY) / (lblH + gapY)));
+          }
+          const itemsPerPage = cols * rowsPerPage;
+          const rows = this.rows || this.getRows();
+          const loopFactor = this.getLoopFactor();
+          const totalLabels = rows.length * loopFactor;
+          const totalPages = Math.ceil(totalLabels / itemsPerPage);
+          document.getElementById("layout-total-pages").textContent = totalPages;
+          const maxPreviewLabels = Math.min(totalLabels, itemsPerPage * Math.min(totalPages, 3));
+          const json = editor.canvas.toJSON(["smartConfig", "customType", "barcodeConfig", "qrcodeConfig", "editable", "lockScalingX"]);
+          const labelImgs = [];
+          for (let i = 0; i < maxPreviewLabels; i++) {
+            const dataIndex = Math.floor(i / loopFactor);
+            const rowData = rows[dataIndex];
+            const objs = editor.canvas.getObjects().slice();
+            for (const obj of objs) {
+              await editor.builder.refreshObjectText(obj, rowData, i, editor.state.tempPrintVars);
+            }
+            editor.canvas.requestRenderAll();
+            await new Promise((r) => setTimeout(r, 2));
+            labelImgs.push(editor.canvas.toDataURL({ format: "png", multiplier: 1.5 }));
+          }
+          editor.canvas.loadFromJSON(json, () => {
+            editor.builder.refreshAllText();
+            editor.canvas.requestRenderAll();
+          });
+          container.innerHTML = "";
+          const SCALE = 2.5;
+          const pageW = Math.round(pdfW * SCALE);
+          const pageH = Math.round(pdfH * SCALE);
+          const lW = Math.round(lblW * SCALE);
+          const lH = Math.round(lblH * SCALE);
+          const sX = Math.round(startX * SCALE);
+          const sY = Math.round(startY * SCALE);
+          const gX = Math.round(gapX * SCALE);
+          const gY = Math.round(gapY * SCALE);
+          let labelIdx = 0;
+          for (let pg = 0; pg < Math.min(totalPages, 3); pg++) {
+            const pageDiv = document.createElement("div");
+            pageDiv.className = "relative bg-white shadow-xl flex-shrink-0";
+            pageDiv.style.cssText = `width:${pageW}px;height:${pageH}px;`;
+            const pgLabel = document.createElement("div");
+            pgLabel.className = "absolute -top-6 left-0 text-xs text-gray-400 font-medium";
+            pgLabel.textContent = `第 ${pg + 1} 页`;
+            pageDiv.appendChild(pgLabel);
+            for (let r = 0; r < rowsPerPage && labelIdx < totalLabels; r++) {
+              for (let c = 0; c < cols && labelIdx < totalLabels; c++) {
+                const x = sX + c * (lW + gX);
+                const y = sY + r * (lH + gY);
+                const slot = document.createElement("div");
+                slot.className = "absolute border border-dashed border-blue-200 overflow-hidden";
+                slot.style.cssText = `left:${x}px;top:${y}px;width:${lW}px;height:${lH}px;`;
+                if (labelImgs[labelIdx]) {
+                  const img = document.createElement("img");
+                  img.src = labelImgs[labelIdx];
+                  img.style.cssText = "width:100%;height:100%;object-fit:contain;";
+                  slot.appendChild(img);
+                } else {
+                  slot.style.background = "#f8fafc";
+                  slot.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#94a3b8;">#${labelIdx + 1}</div>`;
+                }
+                pageDiv.appendChild(slot);
+                labelIdx++;
+              }
+            }
+            if (totalPages > 3 && pg === 2) {
+              const more = document.createElement("div");
+              more.className = "absolute inset-0 bg-black/30 flex items-center justify-center";
+              more.innerHTML = `<span class="text-white font-bold text-lg">还有 ${totalPages - 3} 页...</span>`;
+              pageDiv.appendChild(more);
+            }
+            container.appendChild(pageDiv);
+          }
+        },
+        updateTotalCount: function () {
+          editor.state.printCopies = parseInt(document.getElementById("print-copies").value) || 1;
+          const dataCount = editor.print.getRows().length;
+          let maxRepeat = 1;
+          editor.canvas.getObjects().forEach((o) => {
+            if (o.smartConfig && o.smartConfig.segments) {
+              o.smartConfig.segments.forEach((seg) => {
+                if (seg.type === "serial") maxRepeat = Math.max(maxRepeat, parseInt(seg.repeat) || 1);
+              });
+            }
+          });
+          const total = dataCount * (editor.state.printCopies * maxRepeat);
+          document.getElementById("print-total-count").innerText = total;
+          editor.print.renderPreview(editor.state.previewIndex);
+        },
+        getRows: function () {
+          const hasDatasource = editor.canvas.getObjects().some((o) => o.smartConfig && o.smartConfig.segments.some((s) => s.type === "datasource"));
+          return hasDatasource ? editor.state.dataRows : [null];
+        },
+        openModal: function () {
+          const p = editor.state.paper;
+          const gv = (id, fb) => parseFloat(document.getElementById(id)?.value) || fb;
+          if (!p.matchLabel) {
+            p.width = gv("paper-width", p.width);
+            p.height = gv("paper-height", p.height);
+            p.marginTop = gv("layout-margin-top", p.marginTop);
+            p.marginLeft = gv("layout-margin-left", p.marginLeft);
+            p.gapX = gv("layout-gap-x", p.gapX);
+            p.gapY = gv("layout-gap-y", p.gapY);
+          }
+          document.getElementById("print-modal").classList.remove("hidden");
+          const varContainer = document.getElementById("print-vars-list");
+          varContainer.innerHTML = "";
+          editor.state.tempPrintVars = {};
+          editor.state.variables.forEach((v) => {
+            editor.state.tempPrintVars[v.name] = v.value;
+            const div = document.createElement("div");
+            div.className = "flex items-center gap-2 text-sm";
+            div.innerHTML = `<span class="w-1/3 text-gray-600 truncate text-right pr-2">${v.name}:</span><input type="text" value="${v.value}" oninput="editor.state.tempPrintVars['${v.name}'] = this.value; editor.print.renderPreview(editor.state.previewIndex);" class="flex-1 border rounded px-2 py-1 text-xs">`;
+            varContainer.appendChild(div);
+          });
+          document.getElementById("print-paper-size").innerText = `${editor.state.paper.width} x ${editor.state.paper.height} mm`;
+          this.rows = this.getRows();
+          const showLayoutTab = !editor.state.paper.matchLabel;
+          const tabEl = document.getElementById("preview-mode-tabs");
+          if (tabEl) tabEl.classList.toggle("hidden", !showLayoutTab);
+          this._currentTab = "single";
+          document.getElementById("panel-single-preview").classList.remove("hidden");
+          document.getElementById("panel-layout-preview").classList.add("hidden");
+          document.getElementById("single-nav").classList.remove("hidden");
+          document.getElementById("layout-nav").classList.add("hidden");
+          if (document.getElementById("tab-single-preview")) document.getElementById("tab-single-preview").classList.add("active");
+          if (document.getElementById("tab-layout-preview")) document.getElementById("tab-layout-preview").classList.remove("active");
+          this.updateTotalCount();
+          this.renderPreview(0);
+        },
+        prevLabel: function () {
+          if (editor.state.previewIndex > 0) this.renderPreview(editor.state.previewIndex - 1);
+        },
+        nextLabel: function () {
+          const totalLabels = parseInt(document.getElementById("print-total-count").innerText);
+          if (editor.state.previewIndex < totalLabels - 1) this.renderPreview(editor.state.previewIndex + 1);
+        },
+        getLoopFactor: function () {
+          let maxRepeat = 1;
+          editor.canvas.getObjects().forEach((o) => {
+            if (o.smartConfig && o.smartConfig.segments) {
+              o.smartConfig.segments.forEach((seg) => {
+                if (seg.type === "serial") maxRepeat = Math.max(maxRepeat, parseInt(seg.repeat) || 1);
+              });
+            }
+          });
+          return editor.state.printCopies * maxRepeat;
+        },
+        renderPreview: async function (index) {
+          const loopFactor = this.getLoopFactor();
+          const totalLabels = this.rows.length * loopFactor;
+          editor.state.previewIndex = index;
+          document.getElementById("preview-counter").innerText = `${index + 1} / ${totalLabels}`;
+          document.getElementById("btn-prev-label").disabled = index === 0;
+          document.getElementById("btn-next-label").disabled = index === totalLabels - 1;
+          const dataIndex = Math.floor(index / loopFactor);
+          const rowData = this.rows[dataIndex];
+          const json = editor.canvas.toJSON(["smartConfig", "customType", "barcodeConfig", "qrcodeConfig", "editable", "lockScalingX"]);
+          const objsToRefresh = editor.canvas.getObjects().slice();
+          for (const obj of objsToRefresh) {
+            await editor.builder.refreshObjectText(obj, rowData, index, editor.state.tempPrintVars);
+          }
+          editor.canvas.requestRenderAll();
+          const imgData = editor.canvas.toDataURL({ format: "png", multiplier: 2 });
+          document.getElementById("print-preview-img").src = imgData;
+          editor.canvas.loadFromJSON(json, () => {
+            editor.builder.refreshAllText();
+            editor.canvas.requestRenderAll();
+          });
+        },
+        executePrint: async function () {
+          const { jsPDF } = window.jspdf;
+          const p = editor.state.paper;
+          const lblW = editor.state.widthMm;
+          const lblH = editor.state.heightMm;
+          const pdfW = p.matchLabel ? lblW : p.width;
+          const pdfH = p.matchLabel ? lblH : p.height;
+          const doc = new jsPDF({ orientation: pdfW > pdfH ? "l" : "p", unit: "mm", format: [pdfW, pdfH] });
+          const rows = this.rows;
+          const loopFactor = this.getLoopFactor();
+          Swal.fire({ title: `正在生成 PDF...`, text: "请稍候", didOpen: () => Swal.showLoading() });
+          const json = editor.canvas.toJSON(["smartConfig", "customType", "barcodeConfig", "qrcodeConfig", "editable", "lockScalingX"]);
+          const startX = p.matchLabel ? 0 : p.marginLeft;
+          const startY = p.matchLabel ? 0 : p.marginTop;
+          const gapX = p.matchLabel ? 0 : p.gapX;
+          const gapY = p.matchLabel ? 0 : p.gapY;
+          let cols = 1,
+            rowsPerPage = 1;
+          if (!p.matchLabel) {
+            cols = Math.floor((p.width - p.marginLeft) / (lblW + gapX));
+            rowsPerPage = Math.floor((p.height - p.marginTop) / (lblH + gapY));
+          }
+          const itemsPerPage = cols * rowsPerPage;
+          let globalCounter = 0;
+          for (let i = 0; i < rows.length; i++) {
+            const rowData = rows[i];
+            for (let c = 0; c < loopFactor; c++) {
+              const objsSnap = editor.canvas.getObjects().slice();
+              for (const obj of objsSnap) {
+                await editor.builder.refreshObjectText(obj, rowData, globalCounter, editor.state.tempPrintVars);
+              }
+              editor.canvas.requestRenderAll();
+              await new Promise((r) => setTimeout(r, 5));
+              const imgData = editor.canvas.toDataURL({ format: "png", multiplier: 2 });
+              const pageIndex = Math.floor(globalCounter / itemsPerPage);
+              const itemIndexOnPage = globalCounter % itemsPerPage;
+              if (globalCounter > 0 && itemIndexOnPage === 0) {
+                doc.addPage([pdfW, pdfH]);
+              }
+              const colIndex = itemIndexOnPage % cols;
+              const rowIndex = Math.floor(itemIndexOnPage / cols);
+              const x = startX + colIndex * (lblW + gapX);
+              const y = startY + rowIndex * (lblH + gapY);
+              doc.addImage(imgData, "PNG", x, y, lblW, lblH);
+              globalCounter++;
+            }
+          }
+          editor.canvas.loadFromJSON(json, () => {
+            editor.builder.refreshAllText();
+            editor.canvas.requestRenderAll();
+            Swal.close();
+
+            // 1. 注入自动打印指令
+            doc.autoPrint();
+            const blobUrl = doc.output("bloburl");
+
+            let iframe = document.getElementById("_print_iframe");
+            if (!iframe) {
+              iframe = document.createElement("iframe");
+              iframe.id = "_print_iframe";
+              // 隐藏 iframe，但保留微小的宽高防止部分浏览器不渲染插件
+              iframe.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;border:none;opacity:0;";
+              document.body.appendChild(iframe);
+            }
+
+            // 2. 直接赋值，PDF 内置的 autoPrint 会自动唤起打印
+            iframe.src = blobUrl;
+
+            // 3. 移除原来的 try-catch，因为已经不需要通过 JS 强行调用 print()
+            iframe.onload = () => {
+              // 释放之前的 Blob URL 避免内存泄漏
+              URL.revokeObjectURL(blobUrl);
+            };
+          });
+        },
+      },
+    };
+    window.onload = () => editor.init();
+  </script>
+</body>
+
+</html>

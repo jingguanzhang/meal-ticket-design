@@ -1,0 +1,3840 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>易饭票-设计打印工具</title>
+    <link href="./dist/bootstrap.min.css" rel="stylesheet" />
+    <link rel="shortcut icon" href="./favicon.ico"/>
+    <link rel="stylesheet" href="./dist/bootstrap-icons.css" />
+    <style>
+      :root {
+        --header-h: 56px;
+        --sidebar-left-w: 280px;
+        --sidebar-right-w: 280px;
+        --bg-workspace: #f0f2f5;
+        --border-color: #e9ecef;
+        --accent-color: #0d6efd;
+        --text-label: #6c757d;
+      }
+
+      body {
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        background: white;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        font-size: 0.875rem;
+      }
+
+      header {
+        height: var(--header-h);
+        background: white;
+        border-bottom: 1px solid var(--border-color);
+        z-index: 100;
+        flex-shrink: 0;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+        display: flex;
+      }
+
+      .logo-text {
+        font-weight: 600;
+        font-size: 1.1rem;
+        color: #333;
+      }
+
+      #main-container {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .sidebar {
+        background: white;
+        display: flex;
+        flex-direction: column;
+        z-index: 20;
+        overflow-y: auto;
+      }
+
+      .sidebar-left {
+        width: var(--sidebar-left-w);
+        border-right: 1px solid var(--border-color);
+      }
+
+      .sidebar-right {
+        width: var(--sidebar-right-w);
+        border-left: 1px solid var(--border-color);
+        background: #fafafa;
+      }
+
+      .section-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #495057;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 16px 0 8px 0;
+        margin-bottom: 12px;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .section-header .form-switch {
+        min-height: auto;
+      }
+
+      .section-header i {
+        color: var(--accent-color);
+      }
+
+      .form-label-xs {
+        font-size: 0.75rem;
+        color: var(--text-label);
+        margin-bottom: 4px;
+        font-weight: 500;
+        display: block;
+      }
+
+      .form-control-xs,
+      .form-select-xs,
+      .input-group-text-xs {
+        font-size: 0.8rem !important;
+        padding: 0.3rem 0.5rem;
+      }
+
+      .input-group-text-xs {
+        background-color: #f8f9fa;
+        color: #666;
+      }
+
+      #workspace-design {
+        flex: 1;
+        background: var(--bg-workspace);
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #viewport-container {
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        position: relative;
+        cursor: default;
+        background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+        background-size: 20px 20px;
+      }
+
+      #viewport-container:focus {
+        outline: none;
+      }
+
+      #canvas-area {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform-origin: center center;
+        transform: translate(-50%, -50%);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        background: white;
+      }
+
+      .floating-toolbar {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        padding: 8px;
+        gap: 8px;
+        z-index: 50;
+        border: 1px solid var(--border-color);
+        font-size: 1rem;
+      }
+
+      .tool-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 6px;
+        border: none;
+        background: transparent;
+        color: #555;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        position: relative;
+      }
+
+      .tool-btn:hover {
+        background: #f1f3f5;
+        color: var(--accent-color);
+      }
+
+      .tool-btn:active {
+        background: #e9ecef;
+      }
+
+      .tool-btn::after {
+        content: attr(data-title);
+        position: absolute;
+        left: 110%;
+        top: 50%;
+        transform: translateY(-50%);
+        background: #333;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s;
+        z-index: 60;
+      }
+
+      .tool-btn:hover::after {
+        opacity: 1;
+      }
+
+      .status-bar {
+        height: 32px;
+        background: white;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 16px;
+        font-size: 0.75rem;
+        color: var(--text-label);
+        z-index: 30;
+      }
+
+      .zoom-controls {
+        position: absolute;
+        bottom: 40px;
+        right: 20px;
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      }
+
+      .zoom-btn {
+        width: 28px;
+        height: 28px;
+        border: none;
+        background: transparent;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+        color: #555;
+      }
+
+      .zoom-btn:hover {
+        background: #f0f0f0;
+      }
+
+      #workspace-preview {
+        flex: 1;
+        background: #525659;
+        overflow-y: auto;
+        display: none;
+        padding: 40px;
+        text-align: center;
+        position: relative;
+      }
+
+      #print-container {
+        display: none;
+      }
+
+      @media print {
+        body > * {
+          display: none !important;
+        }
+
+        #print-container {
+          display: block !important;
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+        }
+
+        @page {
+          size: auto;
+          margin: 0;
+        }
+      }
+
+      .nav-tabs .nav-link {
+        color: #6c757d;
+        font-weight: 500;
+        border: none;
+        border-bottom: 2px solid transparent;
+      }
+
+      .nav-tabs .nav-link:hover {
+        color: var(--accent-color);
+        background: #f8f9fa;
+      }
+
+      .nav-tabs .nav-link.active {
+        color: var(--accent-color);
+        border-bottom: 2px solid var(--accent-color);
+        background: white;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #adb5bd;
+      }
+
+      .empty-state i {
+        font-size: 2rem;
+        display: block;
+        margin-bottom: 10px;
+      }
+
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 3px;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: #aaa;
+      }
+
+      .asset-grid-container {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+
+      .asset-item {
+        aspect-ratio: 1;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: white;
+        padding: 8px;
+      }
+
+      .asset-item:hover {
+        border-color: var(--accent-color);
+        background-color: #f0f7ff;
+        transform: translateY(-2px);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+      }
+
+      .asset-item img {
+        max-width: 100%;
+        max-height: 100%;
+        pointer-events: none;
+      }
+
+      .layer-controls,
+      .align-controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 4px;
+        margin-bottom: 1rem;
+      }
+
+      .layer-btn,
+      .align-btn {
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+        background: white;
+        color: #495057;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .layer-btn:hover,
+      .align-btn:hover {
+        background: #f8f9fa;
+        color: var(--accent-color);
+        border-color: #ced4da;
+      }
+
+      .layer-btn:active,
+      .align-btn:active {
+        background: #e9ecef;
+        transform: translateY(1px);
+      }
+
+      /* 分布按钮特定布局 */
+      .distribute-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        margin-bottom: 1rem;
+      }
+
+      .welcome-modal .modal-dialog {
+        max-width: 960px;
+      }
+
+      .welcome-modal .modal-content {
+        height: 650px;
+        border: none;
+        border-radius: 16px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        overflow: hidden;
+        display: flex;
+        flex-direction: row;
+      }
+
+      .welcome-modal .modal-body {
+        padding: 0;
+        display: flex;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* 左侧导航栏 */
+      .welcome-sidebar {
+        flex: 0 0 280px;
+        background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+        color: white;
+        padding: 40px 30px;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        z-index: 1;
+      }
+
+      /* 装饰性背景圆 */
+      .welcome-sidebar::before {
+        content: "";
+        position: absolute;
+        top: -100px;
+        left: -100px;
+        width: 300px;
+        height: 300px;
+        background: radial-gradient(circle, rgba(13, 110, 253, 0.4) 0%, rgba(0, 0, 0, 0) 70%);
+        opacity: 0.6;
+        pointer-events: none;
+        z-index: -1;
+      }
+      .template-icon {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+      }
+      .app-brand {
+        margin-bottom: 40px;
+      }
+
+      .app-brand h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 0.25rem;
+        letter-spacing: -0.5px;
+      }
+
+      .app-brand .badge {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        font-weight: 400;
+        font-size: 0.75rem;
+        padding: 4px 8px;
+        border-radius: 6px;
+      }
+
+      .action-group {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      /* 主操作按钮 */
+      .hero-btn {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 16px 20px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        color: white;
+        text-align: left;
+        transition: all 0.2s ease;
+        cursor: pointer;
+      }
+
+      .hero-btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.3);
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+      }
+
+      .hero-btn.primary {
+        background: #0d6efd;
+        border-color: #0d6efd;
+        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+      }
+
+      .hero-btn.primary:hover {
+        background: #0b5ed7;
+        border-color: #0a58ca;
+      }
+
+      .hero-btn i {
+        font-size: 1.5rem;
+      }
+
+      .hero-btn-content {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .hero-btn-title {
+        font-weight: 600;
+        font-size: 1rem;
+      }
+
+      .hero-btn-desc {
+        font-size: 0.75rem;
+        opacity: 0.7;
+        margin-top: 2px;
+      }
+
+      .sidebar-footer {
+        margin-top: auto;
+        font-size: 0.75rem;
+        opacity: 0.5;
+        text-align: center;
+      }
+
+      /* 右侧内容区 */
+      .welcome-content {
+        flex: 1;
+        background: #f8f9fa;
+        padding: 40px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .content-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+      }
+
+      .content-header h3 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #343a40;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .template-scroll-area {
+        flex: 1;
+        overflow-y: auto;
+        padding-right: 5px;
+        scrollbar-width: thin;
+      }
+
+      .template-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 20px;
+        padding-bottom: 20px;
+      }
+
+      .template-card {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #e9ecef;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        position: relative;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .template-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08);
+        border-color: transparent;
+      }
+
+      .template-card:hover .template-preview {
+        background-color: #e7f1ff;
+        color: #0d6efd;
+      }
+
+      .template-preview {
+        aspect-ratio: 16/10;
+        background: #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+        color: #adb5bd;
+        transition: all 0.3s;
+      }
+
+      .template-info {
+        padding: 16px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .template-name {
+        font-weight: 600;
+        color: #212529;
+        font-size: 0.95rem;
+        margin-bottom: 6px;
+      }
+
+      .template-desc {
+        font-size: 0.75rem;
+        color: #6c757d;
+        line-height: 1.4;
+        margin-bottom: 12px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .template-tags {
+        margin-top: auto;
+      }
+
+      .template-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        background: #f8f9fa;
+        color: #495057;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        font-size: 0.7rem;
+        font-weight: 500;
+      }
+
+      .form-range::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 0.5rem;
+        cursor: pointer;
+        background-color: #dee2e6;
+        border-radius: 1rem;
+      }
+
+      .form-range::-webkit-slider-thumb {
+        background: var(--accent-color);
+        margin-top: -0.25rem;
+      }
+
+      .form-range::-moz-range-track {
+        width: 100%;
+        height: 0.5rem;
+        cursor: pointer;
+        background-color: #dee2e6;
+        border-radius: 1rem;
+      }
+
+      .form-range::-moz-range-thumb {
+        background: var(--accent-color);
+        border: none;
+      }
+
+      .form-range:focus::-webkit-slider-thumb {
+        box-shadow:
+          0 0 0 1px #fff,
+          0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+      }
+
+      .template-card:hover .template-badge {
+        background: #0d6efd;
+        color: white;
+        border-color: #0d6efd;
+      }
+
+      /* 字体选项样式 */
+      option {
+        font-family: inherit;
+      }
+
+      .font-option {
+        font-family: inherit;
+      }
+
+      /* 加载本地字体按钮样式 */
+      .btn-load-font {
+        padding: 0.3rem 0.5rem;
+        font-size: 0.8rem;
+        white-space: nowrap;
+      }
+
+      /* 环形文字特定样式优化 */
+      .range-value-display {
+        font-weight: 600;
+        color: var(--accent-color);
+      }
+      .logo{
+        width: 35px;
+        height: 35px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- 欢迎页模态框 -->
+    <div class="modal fade welcome-modal" id="welcomeModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+          <div class="modal-body">
+            <div class="welcome-sidebar">
+              <div class="app-brand">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <img src="./dist/app.png" class="logo" />
+                  <h2>易饭票</h2>
+                </div>
+              </div>
+
+              <div class="action-group">
+                <button class="hero-btn primary" id="btn-new-project">
+                  <i class="bi bi-plus-lg"></i>
+                  <div class="hero-btn-content">
+                    <span class="hero-btn-title">新建饭票</span>
+                    <span class="hero-btn-desc">从零开始创建自定义饭票</span>
+                  </div>
+                </button>
+
+                <button class="hero-btn" id="btn-welcome-open">
+                  <i class="bi bi-folder2-open"></i>
+                  <div class="hero-btn-content">
+                    <span class="hero-btn-title">打开饭票</span>
+                    <span class="hero-btn-desc">导入饭票工程继续编辑</span>
+                  </div>
+                </button>
+              </div>
+
+              <div class="sidebar-footer">
+                <p>&copy; 免费软件<br />By: Jingguanzhang</p>
+              </div>
+            </div>
+
+            <div class="welcome-content">
+              <div class="content-header">
+                <h3><i class="bi bi-grid-fill text-primary"></i> 推荐模板</h3>
+                <div class="text-muted small">快速开始您的设计</div>
+              </div>
+
+              <div class="template-scroll-area">
+                <div class="template-grid" id="template-list">
+                  <div class="text-center py-5 w-100" style="grid-column: 1 / -1">
+                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                    <p class="text-muted small">正在加载云端模板库...</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. 顶部栏 -->
+    <header class="align-items-center px-4 justify-content-between">
+      <div class="d-flex align-items-center gap-1">
+        <div class="logo-text d-flex align-items-center gap-2 me-4">
+          <img src="./dist/app.png" class="logo" />
+          <span>易饭票</span>
+        </div>
+        <button class="btn border btn-sm px-2" id="btn-open-project"><i class="bi bi-folder2-open"></i> 打开</button>
+        <button class="btn border btn-sm px-2" id="btn-save-project"><i class="bi bi-save"></i> 保存</button>
+        <div class="btn-group ms-3" role="group">
+          <button class="btn btn-sm border-0" id="btn-undo" disabled title="撤销 (Ctrl+Z)"><i class="bi bi-arrow-90deg-left"></i></button>
+          <button class="btn btn-sm border-0" id="btn-redo" disabled title="重做 (Ctrl+Y)"><i class="bi bi-arrow-90deg-right"></i></button>
+        </div>
+      </div>
+
+      <div class="bg-light p-1 rounded-pill border d-flex">
+        <input type="radio" class="btn-check" name="app-mode" id="mode-design" value="design" checked autocomplete="off" />
+        <label class="btn btn-sm btn-outline-primary rounded-pill px-3 border-0" for="mode-design"><i class="bi bi-pencil-square"></i> 设计</label>
+
+        <input type="radio" class="btn-check" name="app-mode" id="mode-preview" value="preview" autocomplete="off" />
+        <label class="btn btn-sm btn-outline-primary rounded-pill px-3 border-0" for="mode-preview"><i class="bi bi-eye"></i> 预览</label>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button class="btn border-0" id="btn-fullscreen" title="全屏切换"><i class="bi bi-arrows-fullscreen"></i></button>
+        <button class="btn btn-outline-danger btn-sm px-3" id="btn-support" title="支持作者"><i class="bi bi-heart-fill"></i> 支持作者</button>
+        <button class="btn btn-primary btn-sm px-3" id="btn-print"><i class="bi bi-printer-fill"></i> 打印</button>
+      </div>
+    </header>
+
+    <input type="file" id="file-open-project" hidden accept=".fpt,.json" />
+
+    <div id="main-container">
+      <aside class="sidebar sidebar-left px-3 py-2">
+        <div class="mb-2">
+          <div class="section-header"><i class="bi bi-file-earmark-richtext"></i> 纸张规格</div>
+          <div class="row g-2 mb-2">
+            <div class="col-8">
+              <label class="form-label-xs">纸张尺寸</label>
+              <select class="form-select form-select-xs" id="cfg-paper-size">
+                <option value="A3">A3 (297×420 mm)</option>
+                <option value="A4" selected>A4 (210×297 mm)</option>
+                <option value="A5">A5 (148×210 mm)</option>
+                <option value="B4">B4 (250×353 mm)</option>
+                <option value="B5">B5 (176×250 mm)</option>
+                <option value="letter">信纸 (Letter 216×279 mm)</option>
+                <option value="legal">法律用纸 (Legal 216×356 mm)</option>
+                <option value="16k">16开 (184×260 mm)</option>
+                <option value="8k">8开 (368×260 mm)</option>
+                <option value="custom">自定义尺寸...</option>
+              </select>
+            </div>
+            <div class="col-4">
+              <label class="form-label-xs">纸张方向</label>
+              <select class="form-select form-select-xs" id="cfg-paper-orient">
+                <option value="p">纵向</option>
+                <option value="l">横向</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 自定义纸张尺寸输入框 (默认隐藏) -->
+          <div class="row g-2 mb-2" id="custom-paper-dims" style="display: none">
+            <div class="col-6">
+              <label class="form-label-xs">宽度</label>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control form-control-xs" id="cfg-paper-width" value="210" min="10" />
+                <span class="input-group-text input-group-text-xs">mm</span>
+              </div>
+            </div>
+            <div class="col-6">
+              <label class="form-label-xs">高度</label>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control form-control-xs" id="cfg-paper-height" value="297" min="10" />
+                <span class="input-group-text input-group-text-xs">mm</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-light p-2 rounded border mb-1">
+            <label class="form-label-xs mb-2">页面边距</label>
+            <div class="row g-2">
+              <div class="col-6">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text input-group-text-xs border-end-0 bg-white">上</span>
+                  <input type="number" class="form-control form-control-xs border-start-0 ps-1" id="cfg-margin-top" value="0" min="0" />
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text input-group-text-xs border-end-0 bg-white">下</span>
+                  <input type="number" class="form-control form-control-xs border-start-0 ps-1" id="cfg-margin-bottom" value="0" min="0" />
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text input-group-text-xs border-end-0 bg-white">左</span>
+                  <input type="number" class="form-control form-control-xs border-start-0 ps-1" id="cfg-margin-left" value="0" min="0" />
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text input-group-text-xs border-end-0 bg-white">右</span>
+                  <input type="number" class="form-control form-control-xs border-start-0 ps-1" id="cfg-margin-right" value="0" min="0" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-2">
+          <div class="section-header d-flex justify-content-between align-items-center">
+            <div><i class="bi bi-grid-3x3-gap"></i> 打印拼版</div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="cfg-show-cutlines" checked />
+              <label class="form-check-label form-label-xs mb-0" for="cfg-show-cutlines">显示裁剪线</label>
+            </div>
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-3">
+              <label class="form-label-xs">行数</label>
+              <input type="number" class="form-control form-control-xs" id="cfg-rows" value="5" min="1" />
+            </div>
+            <div class="col-3">
+              <label class="form-label-xs">列数</label>
+              <input type="number" class="form-control form-control-xs" id="cfg-cols" value="2" min="1" />
+            </div>
+            <div class="col-3">
+              <label class="form-label-xs">横向间距</label>
+              <input type="number" class="form-control form-control-xs" id="cfg-gap-x" value="0" min="0" />
+            </div>
+            <div class="col-3">
+              <label class="form-label-xs">纵向间距</label>
+              <input type="number" class="form-control form-control-xs" id="cfg-gap-y" value="0" min="0" />
+            </div>
+          </div>
+          <div class="input-group input-group-sm mb-2">
+            <span class="input-group-text input-group-text-xs">生成数量</span>
+            <input type="number" class="form-control form-control-xs" id="cfg-print-total" value="10" min="1" />
+          </div>
+        </div>
+
+        <!-- 面板 C: 样式与边框 -->
+        <div class="mb-2">
+          <div class="section-header"><i class="bi bi-palette"></i> 饭票样式</div>
+          <div class="row g-2 align-items-end mb-2">
+            <div class="col-12">
+              <label class="form-label-xs">背景颜色</label>
+              <div class="input-group input-group-sm">
+                <input type="color" class="form-control form-control-color form-control-xs w-100" id="cfg-canvas-bg" value="#ffffff" />
+              </div>
+            </div>
+          </div>
+
+          <!-- 边框设置区域 -->
+          <div class="mb-3">
+            <div class="row g-2 align-items-center mb-2">
+              <div class="col-6">
+                <label class="form-label-xs">边框样式</label>
+                <select class="form-select form-select-xs mb-1" id="cfg-border-preset"></select>
+              </div>
+
+              <div class="col-6">
+                <label class="form-label-xs">边框颜色</label>
+                <div class="input-group input-group-sm">
+                  <input type="color" class="form-control form-control-color form-control-xs w-100" id="cfg-border-color" value="#aa610e" />
+                </div>
+              </div>
+              <div class="col-6">
+                <label class="form-label-xs">内缩进</label>
+                <div class="input-group input-group-sm">
+                  <input type="number" class="form-control form-control-xs" id="cfg-padding" value="2" placeholder="mm" />
+                  <span class="input-group-text input-group-text-xs">mm</span>
+                </div>
+              </div>
+              <div class="col-6">
+                <label class="form-label-xs">边框缩放</label>
+                <div class="input-group input-group-sm">
+                  <input type="number" class="form-control form-control-xs" id="cfg-border-scale" value="100" max="300" step="10" placeholder="%" />
+                  <span class="input-group-text input-group-text-xs">%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 3. 中央工作区 -->
+      <div id="workspace-design">
+        <!-- A. 悬浮工具栏 -->
+        <div class="floating-toolbar">
+          <button class="tool-btn" id="tool-add-text" data-title="添加文本"><i class="bi bi-fonts"></i></button>
+          <button class="tool-btn" id="tool-add-serial" data-title="添加序列号"><i class="bi bi-123"></i></button>
+          <button class="tool-btn" id="tool-add-curved-text" data-title="添加环形文字"><img src="./dist/fonts/circular-text.svg" width="25px" class="h-auto" /></button>
+          <div style="height: 1px; background: #eee; margin: 2px 0"></div>
+
+          <!-- 基础图形 -->
+          <button class="tool-btn" id="tool-add-rect" data-title="添加矩形框"><i class="bi bi-square"></i></button>
+          <button class="tool-btn" id="tool-add-circle" data-title="添加圆形"><i class="bi bi-circle"></i></button>
+          <button class="tool-btn" id="tool-add-triangle" data-title="添加三角形"><i class="bi bi-triangle"></i></button>
+          <button class="tool-btn" id="tool-add-diamond" data-title="添加菱形"><i class="bi bi-diamond"></i></button>
+          <button class="tool-btn" id="tool-add-star" data-title="添加星形"><i class="bi bi-star"></i></button>
+          <div style="height: 1px; background: #eee; margin: 2px 0"></div>
+          <button class="tool-btn" id="tool-add-line" data-title="添加线条"><i class="bi bi-dash-lg"></i></button>
+          <div style="height: 1px; background: #eee; margin: 2px 0"></div>
+          <button class="tool-btn" onclick="document.getElementById('file-upload-img').click()" data-title="图片"><i class="bi bi-image"></i></button>
+          <input type="file" id="file-upload-img" hidden accept="image/*" />
+        </div>
+
+        <!-- B. 视口容器 -->
+        <div id="viewport-container">
+          <div id="canvas-area">
+            <canvas id="c"></canvas>
+          </div>
+        </div>
+
+        <!-- C. 悬浮缩放控件 -->
+        <div class="zoom-controls">
+          <button class="zoom-btn" id="btn-zoom-out"><i class="bi bi-dash"></i></button>
+          <span class="px-2 small form-label-xs text-muted" id="zoom-level" style="min-width: 45px; text-align: center">100%</span>
+          <button class="zoom-btn" id="btn-zoom-in"><i class="bi bi-plus"></i></button>
+          <div style="width: 1px; height: 16px; background: #ddd; margin: 0 4px"></div>
+          <button class="zoom-btn" id="btn-zoom-fit"><i class="bi bi-arrows-fullscreen"></i></button>
+        </div>
+
+        <!-- D. 底部状态条 -->
+        <div class="status-bar">
+          <span id="info-paper-size">A4: 210 x 297 mm</span>
+          <span><i class="bi bi-mouse me-1"></i>滚轮缩放 • 按住Alt拖拽 • Ctrl+Z撤销 • Ctrl+Y重做</span>
+        </div>
+      </div>
+
+      <!-- 4. 右侧：属性面板 -->
+      <aside class="sidebar sidebar-right px-0">
+        <ul class="nav nav-tabs nav-fill bg-light border-bottom" id="rightSidebarTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active small py-2 rounded-0" id="tab-props-btn" data-bs-toggle="tab" data-bs-target="#tab-props" type="button" role="tab">
+              <i class="bi bi-sliders"></i> 属性
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link small py-2 rounded-0" id="tab-assets-btn" data-bs-toggle="tab" data-bs-target="#tab-assets" type="button" role="tab"><i class="bi bi-images"></i> 素材库</button>
+          </li>
+        </ul>
+
+        <!-- Tab 内容区 -->
+        <div class="tab-content flex-grow-1 overflow-hidden d-flex flex-column" id="rightSidebarContent">
+          <!-- A. 属性页签 -->
+          <div class="tab-pane fade show active h-100 overflow-auto px-3 py-3" id="tab-props" role="tabpanel">
+            <!-- 头部：对象操作 -->
+            <div class="d-grid gap-2 mb-3">
+              <button class="btn btn-sm btn-outline-danger d-none" id="btn-del-obj"><i class="bi bi-trash"></i> 删除</button>
+            </div>
+
+            <!-- 新增：编组控制 -->
+            <div id="group-controls" class="d-none d-grid gap-2 mb-3">
+              <button class="btn btn-sm btn-outline-primary" id="btn-group"><i class="bi bi-collection"></i> 编组</button>
+              <button class="btn btn-sm btn-outline-primary" id="btn-ungroup"><i class="bi bi-collection-play"></i> 解组</button>
+            </div>
+
+            <div id="properties-panel" class="d-none">
+              <div id="props-asset-group" class="pb-2 d-none">
+                <div class="input-group input-group-sm">
+                  <label class="form-label-xs mb-1">填充颜色</label>
+                  <input type="color" class="form-control form-control-color form-control-xs w-100" id="prop-asset-color" value="#000000" />
+                </div>
+              </div>
+
+              <div>
+                <label class="form-label-xs mb-1">层级控制</label>
+                <div class="layer-controls">
+                  <button class="layer-btn" id="btn-layer-front" title="置于顶层"><i class="bi bi-chevron-bar-up"></i></button>
+                  <button class="layer-btn" id="btn-layer-up" title="上移一层"><i class="bi bi-chevron-up"></i></button>
+                  <button class="layer-btn" id="btn-layer-down" title="下移一层"><i class="bi bi-chevron-down"></i></button>
+                  <button class="layer-btn" id="btn-layer-back" title="置于底层"><i class="bi bi-chevron-bar-down"></i></button>
+                </div>
+              </div>
+
+              <!-- 新增：对齐与分布 -->
+              <div id="align-controls" class="d-none mb-3">
+                <label class="form-label-xs mb-1">对齐与分布</label>
+                <!-- 对齐 -->
+                <div class="row g-1 mb-1">
+                  <div class="col-4">
+                    <button class="align-btn w-100" id="btn-align-left" title="左对齐"><i class="bi bi-align-start"></i></button>
+                  </div>
+                  <div class="col-4">
+                    <button class="align-btn w-100" id="btn-align-center-h" title="水平居中"><i class="bi bi-align-middle"></i></button>
+                  </div>
+                  <div class="col-4">
+                    <button class="align-btn w-100" id="btn-align-right" title="右对齐"><i class="bi bi-align-end"></i></button>
+                  </div>
+                </div>
+                <div class="row g-1 mb-1">
+                  <div class="col-4">
+                    <button class="align-btn w-100" id="btn-align-top" title="顶对齐"><i class="bi bi-align-top"></i></button>
+                  </div>
+                  <div class="col-4">
+                    <button class="align-btn w-100" id="btn-align-middle" title="垂直居中"><i class="bi bi-align-center"></i></button>
+                  </div>
+                  <div class="col-4">
+                    <button class="align-btn w-100" id="btn-align-bottom" title="底对齐"><i class="bi bi-align-bottom"></i></button>
+                  </div>
+                </div>
+                <!-- 分布 -->
+                <div class="distribute-row">
+                  <button class="align-btn w-100" id="btn-distribute-h" title="水平分布"><i class="bi bi-distribute-horizontal"></i></button>
+                  <button class="align-btn w-100" id="btn-distribute-v" title="垂直分布"><i class="bi bi-distribute-vertical"></i></button>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label-xs mb-1">位置与尺寸</label>
+                <div class="row g-2 mb-2">
+                  <div class="col-6">
+                    <div class="input-group input-group-sm">
+                      <span class="input-group-text input-group-text-xs">X</span>
+                      <input type="number" class="form-control form-control-xs" id="prop-x" />
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="input-group input-group-sm">
+                      <span class="input-group-text input-group-text-xs">Y</span>
+                      <input type="number" class="form-control form-control-xs" id="prop-y" />
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="input-group input-group-sm">
+                      <span class="input-group-text input-group-text-xs">宽</span>
+                      <input type="number" class="form-control form-control-xs" id="prop-w" />
+                    </div>
+                  </div>
+                  <div class="col-auto px-0 d-flex align-items-end">
+                    <button class="btn btn-sm border" id="btn-lock-aspect" title="锁定宽高比例" style="padding: 0.3rem 0.5rem; font-size: 0.8rem; line-height: 1">
+                      <i class="bi bi-unlock"></i>
+                    </button>
+                  </div>
+                  <div class="col">
+                    <div class="input-group input-group-sm">
+                      <span class="input-group-text input-group-text-xs">高</span>
+                      <input type="number" class="form-control form-control-xs" id="prop-h" />
+                    </div>
+                  </div>
+                  <div class="col-9">
+                    <div class="input-group input-group-sm">
+                      <span class="input-group-text input-group-text-xs">旋转</span>
+                      <input type="number" class="form-control form-control-xs" id="prop-angle" />
+                    </div>
+                  </div>
+                  <div class="col-3">
+                    <div class="btn-group" role="group">
+                      <button class="btn btn-sm border-0" id="btn-flip-x" title="水平翻转"><i class="bi bi-symmetry-vertical"></i></button>
+                      <button class="btn btn-sm border-0" id="btn-flip-y" title="垂直翻转"><i class="bi bi-symmetry-horizontal"></i></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label-xs d-flex justify-content-between">
+                  透明度
+                  <span id="val-opacity" class="range-value-display">100%</span>
+                </label>
+                <input type="range" class="form-range" id="prop-opacity" min="0" max="100" />
+              </div>
+
+              <!-- 图片属性 -->
+              <div id="props-image-group" class="d-none mb-3">
+                <div class="card card-body bg-light p-2 border-0">
+                  <label class="form-label-xs fw-bold mb-2">图片操作</label>
+                  <button class="btn btn-sm btn-outline-primary w-100" id="btn-fit-canvas"><i class="bi bi-aspect-ratio"></i> 适应画布大小</button>
+                </div>
+              </div>
+
+              <!-- 4. 图形属性 (已扩展支持多种图形) -->
+              <div id="props-shape-group" class="d-none">
+                <div class="mb-3">
+                  <label class="form-label-xs">图形样式</label>
+                  <!-- 填充 (非线条) -->
+                  <div class="row g-2 mb-2 align-items-center shape-non-line-only">
+                    <div class="col-8">
+                      <label class="form-label-xs">填充颜色</label>
+                      <input type="color" class="form-control form-control-color form-control-xs w-100" id="prop-shape-fill" />
+                    </div>
+                    <div class="col-4">
+                      <label class="form-check-label form-label-xs" for="prop-shape-fill-trans">透明填充</label>
+                      <div class="form-check form-switch mt-2">
+                        <input class="form-check-input" type="checkbox" id="prop-shape-fill-trans" checked />
+                      </div>
+                    </div>
+                  </div>
+                  <!-- 描边 -->
+                  <div class="row g-2 mb-2">
+                    <div class="col-6">
+                      <label class="form-label-xs">描边颜色</label>
+                      <input type="color" class="form-control form-control-color form-control-xs w-100" id="prop-shape-stroke" />
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label-xs">粗细</label>
+                      <input type="number" class="form-control form-control-xs" id="prop-shape-stroke-width" min="0" step="0.1" />
+                    </div>
+                  </div>
+
+                  <!-- 矩形专用：虚线与圆角 -->
+                  <div class="row g-2 mb-2 shape-rect-only">
+                    <div class="col-6">
+                      <label class="form-label-xs">线条样式</label>
+                      <select class="form-select form-select-xs mb-1" id="prop-shape-stroke-style">
+                        <option value="solid">实线</option>
+                        <option value="dashed">虚线</option>
+                      </select>
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label-xs">圆角大小</label>
+                      <input type="number" class="form-control form-control-xs" id="prop-shape-rx" min="0" />
+                    </div>
+
+                    <div id="prop-stroke-dash-settings" class="col-12 row g-1 d-none">
+                      <div class="col-6">
+                        <label class="form-label-xs">实线段长度</label>
+                        <input type="number" class="form-control form-control-xs" id="prop-dash-len" placeholder="线长" value="5" min="1" />
+                      </div>
+                      <div class="col-6">
+                        <label class="form-label-xs">间隙长度</label>
+                        <input type="number" class="form-control form-control-xs" id="prop-dash-gap" placeholder="间隙" value="5" min="1" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 5. 文本属性 (重构版) -->
+              <div id="props-text-group" class="d-none">
+                <!-- 内容 -->
+                <div class="mb-3">
+                  <label class="form-label-xs">文本内容</label>
+                  <textarea class="form-control form-control-xs" id="prop-content" rows="2"></textarea>
+                </div>
+
+                <!-- 字体与字号 -->
+                <div class="row g-2 mb-3">
+                  <div class="col-8">
+                    <label class="form-label-xs">字体</label>
+                    <div class="input-group input-group-sm">
+                      <select class="form-select form-select-xs" id="prop-font-family">
+                        <option value="Microsoft YaHei">微软雅黑</option>
+                        <option value="SimSun">宋体</option>
+                        <option value="SimHei">黑体</option>
+                        <option value="KaiTi">楷体</option>
+                        <option value="Arial">Arial</option>
+                        <option value="Helvetica">Helvetica</option>
+                        <option value="Courier New">Courier New</option>
+                      </select>
+                      <button class="btn border btn-load-font" type="button" id="btn-load-font" title="加载本地字体">
+                        <i class="bi bi-fonts"></i>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="col-4">
+                    <label class="form-label-xs">字号</label>
+                    <input type="number" class="form-control form-control-xs" id="prop-font-size" placeholder="Size" />
+                  </div>
+                </div>
+
+                <!-- 样式工具栏 (加粗, 斜体, 下划线) -->
+                <div class="row g-2 mb-3">
+                  <div class="col-12">
+                    <label class="form-label-xs mb-1">字形样式</label>
+                    <div class="btn-group btn-group-sm w-100" role="group">
+                      <input type="checkbox" class="btn-check" id="prop-bold" autocomplete="off" />
+                      <label class="btn border" for="prop-bold"><i class="bi bi-type-bold"></i></label>
+
+                      <input type="checkbox" class="btn-check" id="prop-italic" autocomplete="off" />
+                      <label class="btn border" for="prop-italic"><i class="bi bi-type-italic"></i></label>
+
+                      <input type="checkbox" class="btn-check" id="prop-underline" autocomplete="off" />
+                      <label class="btn border" for="prop-underline"><i class="bi bi-type-underline"></i></label>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 对齐方式 -->
+                <div class="row g-2 mb-3">
+                  <div class="col-12">
+                    <label class="form-label-xs mb-1">对齐方式</label>
+                    <div class="btn-group btn-group-sm w-100" role="group">
+                      <input type="radio" class="btn-check" name="text-align" id="align-left" autocomplete="off" value="left" />
+                      <label class="btn border" for="align-left"><i class="bi bi-text-left"></i></label>
+
+                      <input type="radio" class="btn-check" name="text-align" id="align-center" autocomplete="off" value="center" />
+                      <label class="btn border" for="align-center"><i class="bi bi-text-center"></i></label>
+
+                      <input type="radio" class="btn-check" name="text-align" id="align-right" autocomplete="off" value="right" />
+                      <label class="btn border" for="align-right"><i class="bi bi-text-right"></i></label>
+
+                      <input type="radio" class="btn-check" name="text-align" id="align-justify" autocomplete="off" value="justify" />
+                      <label class="btn border" for="align-justify"><i class="bi bi-text-paragraph"></i></label>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 颜色与背景 -->
+                <div class="row g-2 mb-3">
+                  <div class="col-6">
+                    <label class="form-label-xs">文字颜色</label>
+                    <div class="input-group input-group-sm">
+                      <input type="color" class="form-control form-control-color form-control-xs w-100" id="prop-fill" />
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label-xs">背景颜色 <input class="form-check-input" type="checkbox" role="switch" id="prop-text-bg-transparent" checked title="启用背景" /></label>
+                    <div class="input-group input-group-sm">
+                      <input type="color" class="form-control form-control-color form-control-xs w-100" id="prop-text-bg-color" disabled value="#ffffff" />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 高级参数 -->
+                <div class="row g-2 mb-3">
+                  <div class="col-6">
+                    <label class="form-label-xs">字间距</label>
+                    <input type="number" class="form-control form-control-xs" id="prop-char-spacing" step="1" />
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label-xs">行高</label>
+                    <input type="number" class="form-control form-control-xs" id="prop-line-height" step="0.1" />
+                  </div>
+                </div>
+
+                <!-- 环形文字专属属性 (已优化) -->
+                <div id="props-curved-group" class="d-none mb-3 bg-light p-2 border rounded">
+                  <label class="form-label-xs fw-bold mb-3">环形文字设置</label>
+
+                  <div class="row g-2 mb-3">
+                    <div class="col-12">
+                      <label class="form-label-xs d-flex justify-content-between">
+                        <span>半径</span>
+                        <span id="val-curved-radius" class="range-value-display">100</span>
+                      </label>
+                      <input type="range" class="form-range" id="prop-curved-radius" min="10" max="300" step="1" />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label-xs d-flex justify-content-between">
+                        <span>角度 (°)</span>
+                        <span id="val-curved-angle" class="range-value-display">270</span>
+                      </label>
+                      <input type="range" class="form-range" id="prop-curved-angle" min="0" max="360" step="5" />
+                    </div>
+                  </div>
+
+                  <div class="row g-2">
+                    <div class="col-12 d-flex align-items-end">
+                      <button class="btn btn-sm btn-primary w-100" id="btn-update-curved"><i class="bi bi-arrow-repeat"></i> 刷新文字</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="props-serial-group" class="d-none bg-light p-2 border rounded border-opacity-25">
+                <div class="d-flex align-items-center gap-2 mb-2 text-danger">
+                  <i class="bi bi-123"></i>
+                  <span class="form-label-xs">序列号规则配置</span>
+                </div>
+                <div class="row g-2 mb-2">
+                  <div class="col-6">
+                    <label class="form-label-xs">前缀</label>
+                    <input type="text" class="form-control form-control-xs" id="prop-ser-prefix" placeholder="例如 No." />
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label-xs">后缀</label>
+                    <input type="text" class="form-control form-control-xs" id="prop-ser-suffix" placeholder="例如 号" />
+                  </div>
+                </div>
+                <div class="row g-2 mb-2">
+                  <div class="col-6">
+                    <label class="form-label-xs">起始值</label>
+                    <input type="number" class="form-control form-control-xs" id="prop-ser-start" value="1" />
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label-xs">位数</label>
+                    <input type="number" class="form-control form-control-xs" id="prop-ser-digits" value="4" min="1" />
+                  </div>
+                </div>
+                <div class="row g-2">
+                  <div class="col-6">
+                    <label class="form-label-xs">步长</label>
+                    <input type="number" class="form-control form-control-xs" id="prop-ser-step" value="1" />
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label-xs">重复次数</label>
+                    <input type="number" class="form-control form-control-xs" id="prop-ser-repeat" value="1" title="同一号码打印多少次" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="empty-selection-state" class="empty-state">
+              <i class="bi bi-cursor"></i>
+              <p class="small text-muted mb-0">在画布上点击对象<br />以编辑属性</p>
+            </div>
+          </div>
+
+          <div class="tab-pane fade h-100 overflow-auto" id="tab-assets" role="tabpanel">
+            <div class="p-3">
+              <div id="asset-grid" class="asset-grid-container">
+                <div class="text-center text-muted py-4 small">正在加载素材库...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 5. 预览工作区 -->
+      <div id="workspace-preview">
+        <div class="position-absolute top-0 start-0 m-3 z-3 text-white">
+          <div class="btn-group shadow-sm">
+            <button class="btn btn-light btn-sm" id="btn-export-img"><i class="bi bi-image"></i> 导出图片</button>
+            <button class="btn btn-outline-light btn-sm" id="btn-export-pdf"><i class="bi bi-file-pdf"></i> 导出 PDF</button>
+          </div>
+          <span class="ms-3 small opacity-75 bg-dark px-2 py-1 rounded"> 总计: <span id="preview-total-count">0</span> 张 / <span id="preview-total-pages">0</span> 页 </span>
+        </div>
+        <div id="preview-viewport" class="w-100 h-100 overflow-hidden user-select-none" style="cursor: grab">
+          <div id="preview-transform-layer" class="d-flex align-items-center justify-content-center" style="transform-origin: center center; transition: transform 0.1s">
+            <div id="preview-list" class="p-5 text-center"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="print-container"></div>
+
+    <!-- 支持作者模态框 -->
+    <div class="modal fade" id="supportModal" tabindex="-1" aria-labelledby="supportModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="supportModalLabel"><i class="bi bi-heart-fill text-danger"></i> 支持作者</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body text-center">
+            <div class="alert alert-info mb-4" role="alert">
+              <i class="bi bi-info-circle"></i>
+              如果觉得工具好用，欢迎请作者喝杯可乐，激励持续更新 🙏
+            </div>
+            <div class="row g-3">
+              <div class="col-6">
+                <div class="card border">
+                  <div class="card-body">
+                    <h6 class="card-title mb-3"><i class="bi bi-wechat" style="color: #07c160"></i> 微信赞赏</h6>
+                    <div class="qr-placeholder bg-light d-flex align-items-center justify-content-center" style="height: 200px; border-radius: 8px; border: 2px dashed #dee2e6">
+                      <div class="text-center">
+                        <img src="./dist/support.jpg" class="w-100 h-100 object-fit-contain d-block" alt="支持作者" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-6">
+                <div class="card border">
+                  <div class="card-body">
+                    <h6 class="card-title mb-3"><i class="bi bi-wechat" style="color: #07c160"></i> 联系作者</h6>
+                    <div class="qr-placeholder bg-light d-flex align-items-center justify-content-center" style="height: 200px; border-radius: 8px; border: 2px dashed #dee2e6">
+                      <div class="text-center">
+                        <img src="./dist/addme.jpg" class="w-100 h-100 object-fit-contain d-block" alt="联系作者" />
+                        <p class="text-muted small mt-2 mb-0">反馈、功能建议、交流</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+      <div id="liveToast" class="toast align-items-center text-bg-primary border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+          <div class="toast-body" id="toast-message">操作成功</div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+      </div>
+    </div>
+    <script src="./dist/fabric.min.js"></script>
+    <script src="./dist/popper.min.js"></script>
+    <script src="./dist/bootstrap.min.js"></script>
+    <script src="./dist/jspdf.umd.min.js"></script>
+    <script src="./dist/html2canvas.min.js"></script>
+    <script src="./dist/svg-border-generator.js"></script>
+    <script>
+      const MM_TO_PX = 3.7795275591;
+      const PAPERS = {
+        A4: { w: 210, h: 297 },
+        A3: { w: 297, h: 420 },
+        B5: { w: 176, h: 250 },
+        custom: { w: 210, h: 297 },
+      };
+      const BORDER_PRESETS = [
+        { id: "none", name: "无边框", src: null },
+        {
+          id: "c1",
+          name: "单线",
+          src: "./borders/00.svg",
+          w: 150,
+          h: 150,
+          slice: { top: 40, right: 40, bottom: 40, left: 40 },
+          mode: "stretch",
+        },
+        {
+          id: "c2",
+          name: "双线",
+          src: "./borders/0.svg",
+          w: 150,
+          h: 150,
+          slice: { top: 40, right: 40, bottom: 40, left: 40 },
+          mode: "stretch",
+        },
+        {
+          id: "c3",
+          name: "简约花边1",
+          src: "./borders/1.svg",
+          w: 150,
+          h: 150,
+          slice: { top: 40, right: 40, bottom: 40, left: 40 },
+          mode: "stretch",
+        },
+        {
+          id: "c4",
+          name: "简约花边2",
+          src: "./borders/3.svg",
+          w: 100,
+          h: 100,
+          slice: { top: 40, right: 40, bottom: 40, left: 40 },
+          mode: "stretch",
+        },
+        {
+          id: "c5",
+          name: "点状边",
+          src: "./borders/2.svg",
+          w: 100,
+          h: 100,
+          slice: { top: 40, right: 40, bottom: 40, left: 40 },
+          mode: "repeat",
+        },
+        {
+          id: "c6",
+          name: "中式边框1",
+          src: "./borders/5.svg",
+          w: 200,
+          h: 200,
+          slice: { top: 40, right: 40, bottom: 40, left: 40 },
+          mode: "stretch",
+        },
+        {
+          id: "c7",
+          name: "波纹边框",
+          src: "./borders/6.svg",
+          w: 160,
+          h: 160,
+          slice: { top: 18, right: 18.4, bottom: 18, left: 18.4 },
+          mode: "repeat",
+        },
+      ];
+
+      // 模拟模板数据
+      const TEMPLATES = [
+        {
+          id: "template1",
+          name: "饭票1号",
+          description: "基础票设计，适合快速修改使用",
+          icon: "./templates/1.jpg",
+          url: "./templates/1.json",
+        },
+        {
+          id: "template2",
+          name: "正副饭券",
+          description: "适合留底的双联饭券设计",
+          icon: "./templates/2.jpg",
+          url: "./templates/2.json",
+        },
+        {
+          id: "template3",
+          name: "饭票2号",
+          description: "简约风格的饭票设计",
+          icon: "./templates/3.jpg",
+          url: "./templates/3.json",
+        },
+        {
+          id: "template4",
+          name: "带印章的餐券",
+          description: "带有印章效果的饭票设计",
+          icon: "./templates/4.jpg",
+          url: "./templates/4.json",
+        },
+      ];
+      const FORM_SCHEMA = {
+        root: [
+          { id: "cfg-paper-size", key: "paper" },
+          { id: "cfg-paper-width", key: "customW" },
+          { id: "cfg-paper-height", key: "customH" },
+          { id: "cfg-canvas-bg", key: "backgroundColor", default: "#ffffff" }, // 画布背景
+        ],
+        layout: [
+          { id: "cfg-rows", key: "rows", type: "int" },
+          { id: "cfg-cols", key: "cols", type: "int" },
+          { id: "cfg-margin-top", key: "marginT", type: "float" },
+          { id: "cfg-margin-bottom", key: "marginB", type: "float" },
+          { id: "cfg-margin-left", key: "marginL", type: "float" },
+          { id: "cfg-margin-right", key: "marginR", type: "float" },
+          { id: "cfg-gap-x", key: "gapX", type: "float" },
+          { id: "cfg-gap-y", key: "gapY", type: "float" },
+        ],
+        borderSettings: [
+          { id: "cfg-border-preset", key: "preset", default: "none" },
+          { id: "cfg-border-color", key: "color", default: "#aa610e" },
+          { id: "cfg-padding", key: "padding", type: "float", default: 2 },
+          { id: "cfg-border-scale", key: "scale", type: "float", default: 100 },
+        ],
+      };
+
+      const showToast = (msg) => {
+        const el = document.getElementById("liveToast");
+        document.getElementById("toast-message").innerText = msg;
+        const toast = new bootstrap.Toast(el);
+        toast.show();
+      };
+      const debounce = (func, wait) => {
+        let timeout;
+        return function (...args) {
+          clearTimeout(timeout);
+          timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+      };
+
+      class CurvedText extends fabric.Group {
+        constructor(text, options) {
+          options = options || {};
+          const objects = [];
+          const radius = options.radius || 100;
+          const spacing = options.spacing || 12;
+          const centerAngle = options.centerAngle || 270;
+          const fontSize = options.fontSize || 32;
+          const fontFamily = options.fontFamily || "Microsoft YaHei";
+          const fontWeight = options.fontWeight || "bold";
+          const fill = options.fill || "#333333";
+          const characters = text.split("");
+          const totalAngle = (characters.length - 1) * spacing;
+          const startAngle = centerAngle - totalAngle / 2;
+
+          // 用于计算包围盒漂移的变量
+          let minX = Infinity,
+            maxX = -Infinity,
+            minY = Infinity,
+            maxY = -Infinity;
+
+          characters.forEach((char, i) => {
+            const currentAngle = startAngle + i * spacing;
+            const radian = currentAngle * (Math.PI / 180);
+            // 这里计算的是字符中心点的数学坐标（相对于圆心 0,0）
+            const x = Math.cos(radian) * radius;
+            const y = Math.sin(radian) * radius;
+
+            const charObj = new fabric.Text(char, {
+              left: x,
+              top: y,
+              fontSize: fontSize,
+              fontFamily: fontFamily,
+              fontWeight: fontWeight,
+              fill: fill,
+              originX: "center",
+              originY: "center",
+              angle: currentAngle + 90,
+            });
+            objects.push(charObj);
+
+            // 记录极值以估算Group中心相对于圆心的偏移
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          });
+
+          super(objects, options);
+
+          // 计算 Group 中心点相对于数学圆心的位置
+          // Group 的中心点大约位于 (minX + maxX)/2, (minY + maxY)/2
+          const groupCenterX = (minX + maxX) / 2;
+          const groupCenterY = (minY + maxY) / 2;
+
+          // 这个偏移量表示从Group中心到数学圆心(0,0)的向量
+          this.anchorOffset = { x: -groupCenterX, y: -groupCenterY };
+
+          this.set({
+            originX: "center",
+            originY: "center",
+            selectable: true,
+            isCurvedText: true,
+            curvedText: text,
+            curvedRadius: radius,
+            curvedSpacing: spacing,
+            curvedCenterAngle: centerAngle,
+            curvedFontSize: fontSize,
+            curvedFontFamily: fontFamily,
+            curvedFontWeight: fontWeight,
+            curvedFill: fill,
+          });
+
+          // 初始化后立即更新坐标
+          this.setCoords();
+        }
+      }
+
+      const App = {
+        canvas: null,
+        mockAssets: [],
+        previewObjectUrls: [],
+        state: {
+          mode: "design",
+          designZoom: 1,
+          designPanX: 0,
+          designPanY: 0,
+          isDesignPanning: false,
+          previewZoom: 0.6,
+          previewPanX: 0,
+          previewPanY: 0,
+          isPreviewPanning: false,
+          lastMouseX: 0,
+          lastMouseY: 0,
+          ticketSize: { w: 100, h: 50 },
+          paperSize: { w: 210, h: 297 },
+          layout: { rows: 5, cols: 2, marginT: 10, marginL: 10, gapX: 0, gapY: 0 },
+          history: [],
+          historyIndex: -1,
+          isHistoryProcessing: false,
+          maxHistory: 20,
+          isMouseInViewport: false,
+          clipboard: null,
+        },
+
+        init() {
+          this.showWelcomePage();
+          this.canvas = new fabric.Canvas("c", {
+            backgroundColor: "#ffffff",
+            preserveObjectStacking: true,
+            selection: true,
+            enableRetinaScaling: true,
+          });
+          fabric.Object.prototype.set({
+            transparentCorners: false,
+            cornerColor: "#ffffff",
+            cornerStrokeColor: "#0d6efd",
+            borderColor: "#0d6efd",
+            cornerSize: 8,
+            strokeUniform: true,
+            padding: 0,
+            borderScaleFactor: 1.5,
+            originX: "center",
+            originY: "center",
+          });
+
+          this.canvas.on("object:scaling", (e) => {
+            const obj = e.target;
+            if (obj.type === "rect") {
+              const r = obj.baseRadius !== undefined ? obj.baseRadius : obj.rx * obj.scaleX;
+              obj.set({
+                rx: r / obj.scaleX,
+                ry: r / obj.scaleY,
+              });
+            }
+          });
+          this.bindEvents();
+          this.bindDesignViewportEvents();
+          this.bindPreviewViewportEvents();
+          this.bindPropPanelEvents();
+          this.bindLayerControls();
+          this.bindWelcomePageEvents();
+          this.bindHistoryEvents();
+          this.initAssets();
+
+          this.saveHistory();
+        },
+        getCanvasCenter() {
+          const vpt = this.canvas.viewportTransform;
+          return {
+            x: (this.canvas.width / 2 - vpt[4]) / vpt[0],
+            y: (this.canvas.height / 2 - vpt[5]) / vpt[3],
+          };
+        },
+        showWelcomePage() {
+          const welcomeModal = new bootstrap.Modal(document.getElementById("welcomeModal"));
+          welcomeModal.show();
+          this.renderTemplateList();
+        },
+        renderTemplateList() {
+          const container = document.getElementById("template-list");
+          container.innerHTML = "";
+          TEMPLATES.forEach((template) => {
+            const card = document.createElement("div");
+            card.className = "template-card";
+            card.innerHTML = `
+              <div class="template-preview"><img src="${template.icon}" class="template-icon" alt="${template.name}" /></div>
+              <div class="template-info">
+                <div class="template-name">${template.name}</div>
+                <div class="template-desc">${template.description}</div>
+              </div>
+            `;
+            card.onclick = () => this.loadTemplate(template);
+            container.appendChild(card);
+          });
+        },
+        async loadTemplate(template) {
+          try {
+            const welcomeModalEl = document.getElementById("welcomeModal");
+            const welcomeModal = bootstrap.Modal.getInstance(welcomeModalEl);
+            if (welcomeModal) welcomeModal.hide();
+            try {
+              const response = await fetch(template.url);
+              if (!response.ok) throw new Error("模板文件不存在");
+              const templateData = await response.json();
+              this.applyTemplateData(templateData);
+            } catch (fetchError) {
+              console.warn(`无法从加载模板`, fetchError);
+              this.applyTemplateData(this.getMockTemplateData(template.id));
+            }
+          } catch (error) {
+            showToast(`加载模板失败: ${error.message}`);
+            this.createNewProject();
+          }
+        },
+        getMockTemplateData(templateId) {
+          return {
+            version: "1.9",
+            layout: { rows: 5, cols: 2, marginT: 10, marginB: 10, marginL: 10, marginR: 10, gapX: 0, gapY: 0 },
+            paper: "A4",
+            customW: null,
+            customH: null,
+            objects: [],
+            backgroundColor: "#ffffff",
+          };
+        },
+        applyTemplateData(templateData) {
+          if (templateData.layout) {
+            this.state.layout = templateData.layout;
+            document.getElementById("cfg-paper-size").value = templateData.paper || "A4";
+            if (templateData.customW) document.getElementById("cfg-paper-width").value = templateData.customW;
+            if (templateData.customH) document.getElementById("cfg-paper-height").value = templateData.customH;
+            document.getElementById("cfg-rows").value = templateData.layout.rows || 5;
+            document.getElementById("cfg-cols").value = templateData.layout.cols || 2;
+            document.getElementById("cfg-margin-top").value = templateData.layout.marginT || 0;
+            document.getElementById("cfg-margin-bottom").value = templateData.layout.marginB || 0;
+            document.getElementById("cfg-margin-left").value = templateData.layout.marginL || 0;
+            document.getElementById("cfg-margin-right").value = templateData.layout.marginR || 0;
+            document.getElementById("cfg-gap-x").value = templateData.layout.gapX || 0;
+            document.getElementById("cfg-gap-y").value = templateData.layout.gapY || 0;
+          }
+          if (templateData.borderSettings) {
+            this._applyToDOM(FORM_SCHEMA.borderSettings, templateData.borderSettings);
+          }
+          if (templateData.backgroundColor) {
+            this.canvas.backgroundColor = templateData.backgroundColor;
+            document.getElementById("cfg-canvas-bg").value = templateData.backgroundColor;
+          }
+          if (templateData.objects) {
+            this.canvas.loadFromJSON(templateData.objects, () => {
+              const objects = this.canvas.getObjects();
+              objects.forEach((obj) => obj.set({ originX: "center", originY: "center" }));
+              this.canvas.requestRenderAll();
+              this.updateLayout();
+              this.saveHistory();
+            });
+          } else {
+            this.updateLayout();
+            this.saveHistory();
+          }
+        },
+        createNewProject() {
+          const welcomeModalEl = document.getElementById("welcomeModal");
+          const welcomeModal = bootstrap.Modal.getInstance(welcomeModalEl);
+          if (welcomeModal) welcomeModal.hide();
+          this.canvas.clear();
+          this.canvas.backgroundColor = "#ffffff";
+          this.state.layout = { rows: 5, cols: 2, marginT: 10, marginB: 10, marginL: 10, marginR: 10, gapX: 0, gapY: 0 };
+          document.getElementById("cfg-paper-size").value = "A4";
+          document.getElementById("cfg-rows").value = 5;
+          document.getElementById("cfg-cols").value = 2;
+          document.getElementById("cfg-margin-top").value = 0;
+          document.getElementById("cfg-margin-bottom").value = 0;
+          document.getElementById("cfg-margin-left").value = 0;
+          document.getElementById("cfg-margin-right").value = 0;
+          document.getElementById("cfg-gap-x").value = 0;
+          document.getElementById("cfg-gap-y").value = 0;
+          document.getElementById("cfg-canvas-bg").value = "#ffffff";
+          this.updateLayout();
+          this.resetDesignViewport();
+          this.saveHistory();
+        },
+        bindWelcomePageEvents() {
+          document.getElementById("btn-new-project").onclick = () => this.createNewProject();
+          document.getElementById("btn-welcome-open").onclick = () => {
+            const welcomeModalEl = document.getElementById("welcomeModal");
+            const welcomeModal = bootstrap.Modal.getInstance(welcomeModalEl);
+            if (welcomeModal) welcomeModal.hide();
+            this.openProject();
+          };
+        },
+        async loadLocalFonts() {
+          try {
+            if (!window.queryLocalFonts) {
+              showToast("您的浏览器不支持Font Access API，请使用Chrome或Edge最新版");
+              return;
+            }
+            const fonts = await window.queryLocalFonts();
+            if (fonts.length === 0) {
+              showToast("未找到本地字体");
+              return;
+            }
+            const fontSelect = document.getElementById("prop-font-family");
+            const existingFonts = new Set();
+            for (let i = 0; i < fontSelect.options.length; i++) existingFonts.add(fontSelect.options[i].value);
+            let addedCount = 0;
+            fonts.forEach((font) => {
+              const fontName = font.family;
+              if (!existingFonts.has(fontName)) {
+                const option = document.createElement("option");
+                option.value = fontName;
+                option.text = font.fullName || fontName;
+                option.style.fontFamily = fontName;
+                fontSelect.appendChild(option);
+                existingFonts.add(fontName);
+                addedCount++;
+              }
+            });
+            if (addedCount > 0) showToast(`成功加载 ${addedCount} 个本地字体`);
+            else showToast("所有本地字体已存在列表中");
+          } catch (error) {
+            console.error("加载本地字体失败:", error);
+            if (error.name === "NotAllowedError") showToast("字体访问被拒绝，请在浏览器设置中允许字体访问权限");
+            else showToast("加载本地字体失败: " + error.message);
+          }
+        },
+        bindDesignViewportEvents() {
+          const viewport = document.getElementById("viewport-container");
+          viewport.addEventListener(
+            "wheel",
+            (e) => {
+              if (this.state.mode !== "design") return;
+              e.preventDefault();
+              const delta = e.deltaY > 0 ? 0.9 : 1.1;
+              this.setDesignZoom(this.state.designZoom * delta);
+            },
+            { passive: false },
+          );
+          viewport.addEventListener("mousedown", (e) => {
+            if (this.state.mode !== "design") return;
+            if (e.target.id === "viewport-container") {
+              this.canvas.discardActiveObject();
+              this.canvas.requestRenderAll();
+            }
+            if (e.button === 1) {
+              this.state.isDesignPanning = true;
+              this.state.lastMouseX = e.clientX;
+              this.state.lastMouseY = e.clientY;
+              viewport.style.cursor = "grabbing";
+              e.preventDefault();
+            }
+          });
+          window.addEventListener("mousemove", (e) => {
+            if (this.state.isDesignPanning) {
+              const dx = e.clientX - this.state.lastMouseX;
+              const dy = e.clientY - this.state.lastMouseY;
+              this.state.lastMouseX = e.clientX;
+              this.state.lastMouseY = e.clientY;
+              this.state.designPanX += dx;
+              this.state.designPanY += dy;
+              this.applyDesignTransform();
+            }
+          });
+          window.addEventListener("mouseup", () => {
+            if (this.state.isDesignPanning) {
+              this.state.isDesignPanning = false;
+              viewport.style.cursor = "default";
+            }
+          });
+          document.getElementById("btn-zoom-in").onclick = () => this.setDesignZoom(this.state.designZoom * 1.2);
+          document.getElementById("btn-zoom-out").onclick = () => this.setDesignZoom(this.state.designZoom * 0.8);
+          document.getElementById("btn-zoom-fit").onclick = () => this.resetDesignViewport();
+        },
+        setDesignZoom(val) {
+          val = Math.max(0.1, Math.min(val, 5));
+          this.state.designZoom = val;
+          document.getElementById("zoom-level").innerText = Math.round(val * 100) + "%";
+          this.updateCanvasDisplaySize();
+          this.applyDesignTransform();
+        },
+        resetDesignViewport() {
+          this.state.designZoom = 1;
+          this.state.designPanX = 0;
+          this.state.designPanY = 0;
+          this.setDesignZoom(1);
+        },
+        updateCanvasDisplaySize() {
+          const zoom = this.state.designZoom;
+          const baseW = this.state.ticketSize.w * MM_TO_PX;
+          const baseH = this.state.ticketSize.h * MM_TO_PX;
+          this.canvas.setDimensions({ width: baseW * zoom, height: baseH * zoom });
+          this.canvas.setZoom(zoom);
+          const canvasArea = document.getElementById("canvas-area");
+          canvasArea.style.width = baseW * zoom + "px";
+          canvasArea.style.height = baseH * zoom + "px";
+          this.canvas.requestRenderAll();
+        },
+        applyDesignTransform() {
+          const el = document.getElementById("canvas-area");
+          el.style.transform = `translate(calc(-50% + ${this.state.designPanX}px), calc(-50% + ${this.state.designPanY}px))`;
+        },
+        bindPreviewViewportEvents() {
+          const viewport = document.getElementById("preview-viewport");
+          viewport.addEventListener(
+            "wheel",
+            (e) => {
+              if (this.state.mode !== "preview") return;
+              e.preventDefault();
+              const delta = e.deltaY > 0 ? 0.9 : 1.1;
+              this.state.previewZoom = Math.max(0.1, Math.min(this.state.previewZoom * delta, 5));
+              this.applyPreviewTransform();
+            },
+            { passive: false },
+          );
+          viewport.addEventListener("mousedown", (e) => {
+            if (this.state.mode !== "preview") return;
+            this.state.isPreviewPanning = true;
+            this.state.lastMouseX = e.clientX;
+            this.state.lastMouseY = e.clientY;
+            viewport.style.cursor = "grabbing";
+            e.preventDefault();
+          });
+          window.addEventListener("mousemove", (e) => {
+            if (this.state.isPreviewPanning) {
+              const dx = e.clientX - this.state.lastMouseX;
+              const dy = e.clientY - this.state.lastMouseY;
+              this.state.lastMouseX = e.clientX;
+              this.state.lastMouseY = e.clientY;
+              this.state.previewPanX += dx;
+              this.state.previewPanY += dy;
+              this.applyPreviewTransform();
+            }
+          });
+          window.addEventListener("mouseup", () => {
+            if (this.state.isPreviewPanning) {
+              this.state.isPreviewPanning = false;
+              viewport.style.cursor = "grab";
+            }
+          });
+        },
+        applyPreviewTransform() {
+          const layer = document.getElementById("preview-transform-layer");
+          layer.style.transform = `translate(${this.state.previewPanX}px, ${this.state.previewPanY}px) scale(${this.state.previewZoom})`;
+        },
+        bindHistoryEvents() {
+          this.canvas.on("object:added", () => this.saveHistory());
+          this.canvas.on("object:modified", () => this.saveHistory());
+          this.canvas.on("object:removed", () => this.saveHistory());
+        },
+        saveHistory() {
+          if (this.state.isHistoryProcessing) return;
+          const json = JSON.stringify(
+            this.canvas.toJSON([
+              "isSerial",
+              "serialRules",
+              "excludeFromExport",
+              "baseRadius",
+              "strokeUniform",
+              "isCurvedText",
+              "curvedText",
+              "curvedRadius",
+              "curvedSpacing",
+              "curvedCenterAngle",
+              "curvedFontSize",
+              "curvedFontFamily",
+              "curvedFontWeight",
+              "curvedFill",
+              "charSpacing",
+              "lineHeight",
+              "underline",
+            ]),
+          );
+          if (this.state.historyIndex < this.state.history.length - 1) {
+            this.state.history = this.state.history.slice(0, this.state.historyIndex + 1);
+          }
+          this.state.history.push(json);
+          this.state.historyIndex++;
+          if (this.state.history.length > this.state.maxHistory) {
+            this.state.history.shift();
+            this.state.historyIndex--;
+          }
+          this.updateUndoRedoState();
+        },
+        undo() {
+          if (this.state.historyIndex > 0) {
+            this.state.isHistoryProcessing = true;
+            this.state.historyIndex--;
+            const json = JSON.parse(this.state.history[this.state.historyIndex]);
+            this.canvas.loadFromJSON(json, () => {
+              this.state.isHistoryProcessing = false;
+              this.canvas.renderAll();
+              this.updateUndoRedoState();
+            });
+          }
+        },
+        redo() {
+          if (this.state.historyIndex < this.state.history.length - 1) {
+            this.state.isHistoryProcessing = true;
+            this.state.historyIndex++;
+            const json = JSON.parse(this.state.history[this.state.historyIndex]);
+            this.canvas.loadFromJSON(json, () => {
+              this.state.isHistoryProcessing = false;
+              this.canvas.renderAll();
+              this.updateUndoRedoState();
+            });
+          }
+        },
+        updateUndoRedoState() {
+          const btnUndo = document.getElementById("btn-undo");
+          const btnRedo = document.getElementById("btn-redo");
+          if (btnUndo) btnUndo.disabled = this.state.historyIndex <= 0;
+          if (btnRedo) btnRedo.disabled = this.state.historyIndex >= this.state.history.length - 1;
+        },
+        toggleFullscreen() {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch((err) => showToast(`无法进入全屏: ${err.message}`));
+          } else {
+            if (document.exitFullscreen) document.exitFullscreen();
+          }
+        },
+        flipObject(direction) {
+          const obj = this.canvas.getActiveObject();
+          if (!obj) {
+            showToast("请先选择一个对象");
+            return;
+          }
+          if (direction === "x") obj.set("flipX", !obj.flipX);
+          else if (direction === "y") obj.set("flipY", !obj.flipY);
+          obj.setCoords();
+          this.canvas.requestRenderAll();
+          this.saveHistory();
+        },
+        groupSelection() {
+          const activeObj = this.canvas.getActiveObject();
+          if (!activeObj || activeObj.type !== "activeSelection") {
+            if (!activeObj) {
+              showToast("请先框选多个对象");
+            }
+            return;
+          }
+          activeObj.toGroup();
+          this.canvas.requestRenderAll();
+          this.saveHistory();
+        },
+
+        ungroupSelection() {
+          const activeObj = this.canvas.getActiveObject();
+          if (!activeObj || activeObj.type !== "group") {
+            if (activeObj && activeObj.isCurvedText) {
+              showToast("环形文字不可解组");
+              return;
+            }
+            showToast("请选择一个组进行解组");
+            return;
+          }
+          activeObj.toActiveSelection();
+
+          this.canvas.requestRenderAll();
+          this.saveHistory();
+        },
+        alignObjects(alignment) {
+          const activeObjects = this.canvas.getActiveObjects();
+          if (activeObjects.length < 2) return;
+
+          // 计算边界
+          let minX = Infinity,
+            maxX = -Infinity,
+            minY = Infinity,
+            maxY = -Infinity;
+          let totalWidth = 0,
+            totalHeight = 0;
+
+          activeObjects.forEach((o) => {
+            const bound = o.getBoundingRect();
+            if (bound.left < minX) minX = bound.left;
+            if (bound.left + bound.width > maxX) maxX = bound.left + bound.width;
+            if (bound.top < minY) minY = bound.top;
+            if (bound.top + bound.height > maxY) maxY = bound.top + bound.height;
+            totalWidth += bound.width;
+            totalHeight += bound.height;
+          });
+
+          activeObjects.forEach((o) => {
+            const bound = o.getBoundingRect();
+            switch (alignment) {
+              case "left":
+                o.set("left", minX + bound.width / 2);
+                break;
+              case "center":
+                o.set("left", (minX + maxX) / 2);
+                break;
+              case "right":
+                o.set("left", maxX - bound.width / 2);
+                break;
+              case "top":
+                o.set("top", minY + bound.height / 2);
+                break;
+              case "middle":
+                o.set("top", (minY + maxY) / 2);
+                break;
+              case "bottom":
+                o.set("top", maxY - bound.height / 2);
+                break;
+            }
+            o.setCoords();
+          });
+          this.canvas.requestRenderAll();
+          this.saveHistory();
+        },
+        distributeObjects(type) {
+          const activeObjects = this.canvas.getActiveObjects();
+          if (activeObjects.length < 2) return;
+
+          // 按中心点排序
+          if (type === "horizontal") activeObjects.sort((a, b) => a.getCenterPoint().x - b.getCenterPoint().x);
+          else activeObjects.sort((a, b) => a.getCenterPoint().y - b.getCenterPoint().y);
+
+          const first = activeObjects[0].getCenterPoint();
+          const last = activeObjects[activeObjects.length - 1].getCenterPoint();
+          const step = type === "horizontal" ? (last.x - first.x) / (activeObjects.length - 1) : (last.y - first.y) / (activeObjects.length - 1);
+
+          activeObjects.forEach((o, i) => {
+            if (type === "horizontal") o.set("left", first.x + i * step);
+            else o.set("top", first.y + i * step);
+            o.setCoords();
+          });
+          this.canvas.requestRenderAll();
+          this.saveHistory();
+        },
+
+        _updateDefaultTicketCount() {
+          const hasSerials = this.canvas.getObjects().some((o) => o.isSerial);
+          const totalInput = document.getElementById("cfg-print-total");
+          if (!hasSerials) {
+            const { rows, cols } = this.state.layout;
+            totalInput.value = rows * cols;
+          }
+        },
+        _extractFromDOM(schemaGroup) {
+          const res = {};
+          schemaGroup.forEach((item) => {
+            const el = document.getElementById(item.id);
+            if (el) {
+              let val = el.value;
+              if (item.type === "int") val = parseInt(val) || 0;
+              else if (item.type === "float") val = parseFloat(val) || 0;
+              res[item.key] = val;
+            }
+          });
+          return res;
+        },
+        _applyToDOM(schemaGroup, dataSource) {
+          if (!dataSource) return;
+          schemaGroup.forEach((item) => {
+            const el = document.getElementById(item.id);
+            if (el) {
+              let val = dataSource[item.key];
+              if (val === undefined || val === null) val = item.default;
+              if (val !== undefined) el.value = val;
+            }
+          });
+        },
+        updateLayout: debounce(function () {
+          this._doUpdateLayout();
+          if (this.state.mode === "preview") this.generatePreview();
+        }, 100),
+        _doUpdateLayout() {
+          const getVal = (id) => parseFloat(document.getElementById(id)?.value) || 0;
+          const getStr = (id) => document.getElementById(id).value;
+          const sizeType = getStr("cfg-paper-size");
+          const orient = getStr("cfg-paper-orient");
+          let paperW, paperH;
+          if (sizeType === "custom") {
+            paperW = Math.max(10, getVal("cfg-paper-width"));
+            paperH = Math.max(10, getVal("cfg-paper-height"));
+          } else {
+            const p = PAPERS[sizeType];
+            paperW = p.w;
+            paperH = p.h;
+          }
+          if (orient === "l") [paperW, paperH] = [paperH, paperW];
+          this.state.paperSize = { w: paperW, h: paperH };
+          this.state.layout = {
+            rows: Math.max(1, getVal("cfg-rows")),
+            cols: Math.max(1, getVal("cfg-cols")),
+            marginT: getVal("cfg-margin-top"),
+            marginB: getVal("cfg-margin-bottom"),
+            marginL: getVal("cfg-margin-left"),
+            marginR: getVal("cfg-margin-right"),
+            gapX: getVal("cfg-gap-x"),
+            gapY: getVal("cfg-gap-y"),
+          };
+          const { rows, cols, marginT, marginB, marginL, marginR, gapX, gapY } = this.state.layout;
+          const availW = paperW - marginL - marginR - (cols - 1) * gapX;
+          const availH = paperH - marginT - marginB - (rows - 1) * gapY;
+          const ticketW = Math.max(10, availW / cols);
+          const ticketH = Math.max(10, availH / rows);
+          this.state.ticketSize = { w: ticketW, h: ticketH };
+          this.updateCanvasDisplaySize();
+          document.getElementById("info-paper-size").innerText = `${sizeType === "custom" ? "自定义" : sizeType}: ${paperW}x${paperH}mm | 单张: ${ticketW.toFixed(1)}x${ticketH.toFixed(1)}mm`;
+          this._updateDefaultTicketCount();
+          this.renderCanvasExtras();
+        },
+        renderCanvasExtras() {
+          const oldBorder = this.canvas.getObjects().find((o) => o.id === "system-border");
+          if (oldBorder) this.canvas.remove(oldBorder);
+          const presetId = document.getElementById("cfg-border-preset").value;
+          const preset = BORDER_PRESETS.find((p) => p.id === presetId);
+          if (!preset || preset.id === "none") {
+            this.canvas.requestRenderAll();
+            return;
+          }
+          const padMM = parseFloat(document.getElementById("cfg-padding").value) || 0;
+          const pad = padMM * MM_TO_PX;
+          const ticketW = this.state.ticketSize.w * MM_TO_PX;
+          const ticketH = this.state.ticketSize.h * MM_TO_PX;
+          const scalePercent = parseFloat(document.getElementById("cfg-border-scale").value) || 100;
+          const scaleFactor = scalePercent / 100;
+          const targetW = Math.max(10, ticketW - pad * 2);
+          const targetH = Math.max(10, ticketH - pad * 2);
+          const colorHex = document.getElementById("cfg-border-color").value;
+          const tintColor = colorHex;
+          const generator = new SvgBorderGenerator();
+
+          generator
+            .generateFromSVG(preset.src, preset.w * scaleFactor, preset.h * scaleFactor, { width: targetW, height: targetH }, preset.slice, preset.mode, tintColor, 6)
+            .then((pngBase64) => {
+              fabric.Image.fromURL(pngBase64, (img) => {
+                if (!img) {
+                  console.error("Failed to load PNG image from base64.");
+                  return;
+                }
+                img.set({ scaleX: targetW / img.width, scaleY: targetH / img.height });
+                img.set({
+                  id: "system-border",
+                  left: pad,
+                  top: pad,
+                  selectable: false,
+                  evented: false,
+                  excludeFromExport: true,
+                  originX: "left",
+                  originY: "top",
+                });
+                this.canvas.add(img);
+                this.canvas.sendToBack(img);
+                this.canvas.requestRenderAll();
+                if (this.state.mode === "preview") this.generatePreview();
+              });
+            })
+            .catch((error) => {
+              console.error("Error generating or loading border:", error);
+              showToast(`加载边框失败: ${error.message}`);
+            });
+        },
+        initAssets() {
+          const container = document.getElementById("asset-grid");
+          container.innerHTML = "";
+          fetch("./assets/assets.json")
+            .then((r) => r.json())
+            .then((mockAssets) => {
+              mockAssets.forEach((asset) => {
+                const blob = new Blob([asset.svg], { type: "image/svg+xml" });
+                const url = URL.createObjectURL(blob);
+                const div = document.createElement("div");
+                div.className = "asset-item";
+                div.title = asset.name;
+                div.innerHTML = `<img src="${url}" />`;
+                div.onclick = () => this.addSvgAsset(url, asset.svg);
+                container.appendChild(div);
+              });
+            })
+            .catch(() => {
+              container.innerHTML = '<div class="text-center text-muted py-4 small">无法加载素材。</div>';
+            });
+        },
+        print() {
+          this.state.mode = "preview";
+          document.getElementById("mode-preview").checked = true;
+          this.changeView();
+          setTimeout(window.print, 300);
+        },
+        addSvgAsset(url, svgContent) {
+          fabric.loadSVGFromURL(url, (objects, options) => {
+            const svgGroup = fabric.util.groupSVGElements(objects, options);
+            svgGroup.set({
+              left: this.getCanvasCenter().x,
+              top: this.getCanvasCenter().y,
+              isAsset: true,
+              originX: "center",
+              originY: "center",
+            });
+            const targetW = 20 * MM_TO_PX;
+            svgGroup.scaleToWidth(targetW);
+            this._setAssetColor(svgGroup, "#000000");
+            this.canvas.add(svgGroup);
+            this.canvas.setActiveObject(svgGroup);
+            this.canvas.requestRenderAll();
+            const tabBtn = document.getElementById("tab-props-btn");
+            const tabInst = bootstrap.Tab.getOrCreateInstance(tabBtn);
+            tabInst.show();
+          });
+        },
+        _setAssetColor(obj, color) {
+          if (obj.isAsset) {
+            obj.assetColor = color;
+            if (obj.type === "group") {
+              obj.getObjects().forEach((child) => {
+                if (child.fill && child.fill !== "none") child.set("fill", color);
+                if (child.stroke && child.stroke !== "none") child.set("stroke", color);
+              });
+            } else {
+              obj.set("fill", color);
+            }
+          }
+        },
+        bindEvents() {
+          const layoutInputs = [
+            "cfg-margin-top",
+            "cfg-margin-bottom",
+            "cfg-margin-left",
+            "cfg-margin-right",
+            "cfg-rows",
+            "cfg-cols",
+            "cfg-gap-x",
+            "cfg-gap-y",
+            "cfg-border-style",
+            "cfg-border-color",
+            "cfg-padding",
+            "cfg-print-total",
+            "cfg-show-cutlines",
+            "cfg-paper-width",
+            "cfg-paper-height",
+            "cfg-border-preset",
+            "cfg-border-scale",
+          ];
+          const presetSelect = document.getElementById("cfg-border-preset");
+          BORDER_PRESETS.forEach((p) => {
+            const opt = document.createElement("option");
+            opt.value = p.id;
+            opt.text = p.name;
+            presetSelect.appendChild(opt);
+          });
+          layoutInputs.forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener("input", () => this.updateLayout());
+          });
+          const paperSizeSel = document.getElementById("cfg-paper-size");
+          const customDimsDiv = document.getElementById("custom-paper-dims");
+          paperSizeSel.addEventListener("change", () => {
+            if (paperSizeSel.value === "custom") customDimsDiv.style.display = "flex";
+            else customDimsDiv.style.display = "none";
+            this.updateLayout();
+          });
+          const paperOrientSel = document.getElementById("cfg-paper-orient");
+          paperOrientSel.addEventListener("change", () => {
+            if (paperSizeSel.value === "custom") {
+              const wIn = document.getElementById("cfg-paper-width");
+              const hIn = document.getElementById("cfg-paper-height");
+              const temp = wIn.value;
+              wIn.value = hIn.value;
+              hIn.value = temp;
+            }
+            this.updateLayout();
+          });
+          const bgInput = document.getElementById("cfg-canvas-bg");
+          if (bgInput) {
+            bgInput.addEventListener("input", (e) => {
+              this.canvas.backgroundColor = e.target.value;
+              this.canvas.requestRenderAll();
+              if (this.state.mode === "preview") this.updateLayout();
+            });
+          }
+
+          const modeRadios = document.getElementsByName("app-mode");
+          modeRadios.forEach((radio) => {
+            radio.addEventListener("change", (e) => {
+              this.state.mode = e.target.value;
+              this.changeView();
+            });
+          });
+          const bindBtn = (id, fn) => {
+            const btn = document.getElementById(id);
+            if (btn) btn.onclick = fn.bind(this);
+          };
+          bindBtn("tool-add-text", this.addText);
+          bindBtn("tool-add-serial", this.addSerial);
+          bindBtn("tool-add-curved-text", this.addCurvedText);
+          bindBtn("tool-add-line", this.addLine);
+          bindBtn("tool-add-rect", this.addRect);
+          bindBtn("tool-add-circle", this.addCircle);
+          bindBtn("tool-add-triangle", this.addTriangle);
+          bindBtn("tool-add-diamond", this.addDiamond);
+          bindBtn("tool-add-star", this.addStar);
+          bindBtn("btn-save-project", this.saveProject);
+          bindBtn("btn-open-project", this.openProject);
+          bindBtn("btn-export-pdf", this.exportPDF);
+          bindBtn("btn-export-img", this.exportImage);
+          bindBtn("btn-fit-canvas", this.fitImageToCanvas);
+          bindBtn("btn-load-font", this.loadLocalFonts);
+          bindBtn("btn-print", this.print);
+          bindBtn("btn-fullscreen", this.toggleFullscreen);
+
+          // 支持作者按钮
+          bindBtn("btn-support", () => {
+            const supportModal = new bootstrap.Modal(document.getElementById("supportModal"));
+            supportModal.show();
+          });
+
+          // Undo/Redo
+          bindBtn("btn-undo", this.undo);
+          bindBtn("btn-redo", this.redo);
+
+          // Group/Ungroup
+          bindBtn("btn-group", this.groupSelection);
+          bindBtn("btn-ungroup", this.ungroupSelection);
+
+          // Align/Distribute
+          bindBtn("btn-align-left", () => this.alignObjects("left"));
+          bindBtn("btn-align-center-h", () => this.alignObjects("center"));
+          bindBtn("btn-align-right", () => this.alignObjects("right"));
+          bindBtn("btn-align-top", () => this.alignObjects("top"));
+          bindBtn("btn-align-middle", () => this.alignObjects("middle"));
+          bindBtn("btn-align-bottom", () => this.alignObjects("bottom"));
+          bindBtn("btn-distribute-h", () => this.distributeObjects("horizontal"));
+          bindBtn("btn-distribute-v", () => this.distributeObjects("vertical"));
+
+          // Flip
+          bindBtn("btn-flip-x", () => this.flipObject("x"));
+          bindBtn("btn-flip-y", () => this.flipObject("y"));
+
+          const fileInput = document.getElementById("file-upload-img");
+          if (fileInput) {
+            fileInput.onchange = (e) => {
+              const file = e.target.files[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = (f) => {
+                fabric.Image.fromURL(f.target.result, (img) => {
+                  const canvasW = this.state.ticketSize.w * MM_TO_PX;
+                  const canvasH = this.state.ticketSize.h * MM_TO_PX;
+                  const scaleX = (canvasW * 0.9) / img.width;
+                  const scaleY = (canvasH * 0.9) / img.height;
+                  const scale = Math.min(scaleX, scaleY);
+                  img.scale(scale);
+                  img.set({
+                    left: this.getCanvasCenter().x,
+                    top: this.getCanvasCenter().y,
+                    originX: "center",
+                    originY: "center",
+                  });
+                  this.canvas.add(img);
+                  this.canvas.setActiveObject(img);
+                  e.target.value = "";
+                  this._updateDefaultTicketCount();
+                });
+              };
+              reader.readAsDataURL(file);
+            };
+          }
+
+          const viewport = document.getElementById("viewport-container");
+          viewport.addEventListener("mouseenter", () => {
+            this.state.isMouseInViewport = true;
+          });
+
+          viewport.addEventListener("mouseleave", () => {
+            this.state.isMouseInViewport = false;
+          });
+
+          document.addEventListener(
+            "keydown",
+            (e) => {
+              if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT" || e.target.isContentEditable) {
+                console.log(3);
+
+                return;
+              }
+
+              if (App.state.mode !== "design") return;
+              const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+              const key = e.key.toLowerCase();
+
+              if (isCtrlOrCmd && key === "c") {
+                if (this.state.isMouseInViewport) {
+                  if (App.copy()) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }
+                }
+                return;
+              }
+
+              if (isCtrlOrCmd && key === "v") {
+                if (this.state.isMouseInViewport) {
+                  if (App.paste()) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }
+                }
+                return;
+              }
+
+              if (this.state.isMouseInViewport && isCtrlOrCmd && key === "z") {
+                e.preventDefault();
+                if (e.shiftKey) this.redo();
+                else this.undo();
+                return;
+              }
+
+              if (this.state.isMouseInViewport && isCtrlOrCmd && key === "y") {
+                e.preventDefault();
+                this.redo();
+                return;
+              }
+
+              if (this.state.isMouseInViewport && (key === "delete" || key === "backspace")) {
+                App.deleteActiveObject();
+                e.preventDefault();
+                return;
+              }
+
+              if (this.state.isMouseInViewport && ["arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
+                const active = App.canvas.getActiveObject();
+                if (!active) return;
+                e.preventDefault();
+                const step = e.shiftKey ? 10 : 1;
+                if (key === "arrowup") active.top -= step;
+                if (key === "arrowdown") active.top += step;
+                if (key === "arrowleft") active.left -= step;
+                if (key === "arrowright") active.left += step;
+                active.setCoords();
+                App.canvas.requestRenderAll();
+              }
+            },
+            { capture: false },
+          );
+
+          this.canvas.on("mouse:down", (e) => {
+            if (e.target === null) {
+              this.canvas.discardActiveObject();
+              this.canvas.requestRenderAll();
+            }
+          });
+        },
+        changeView() {
+          const designArea = document.getElementById("workspace-design");
+          const previewArea = document.getElementById("workspace-preview");
+          const sidebarRight = document.querySelector(".sidebar-right");
+          if (this.state.mode === "preview") {
+            designArea.style.display = "none";
+            previewArea.style.display = "flex";
+            sidebarRight.style.display = "none";
+            this.generatePreview();
+          } else {
+            previewArea.style.display = "none";
+            designArea.style.display = "flex";
+            sidebarRight.style.display = "flex";
+            this.canvas.calcOffset();
+            this.updateCanvasDisplaySize();
+            this.canvas.requestRenderAll();
+          }
+        },
+        addText() {
+          const text = new fabric.IText("双击编辑文本", {
+            left: this.getCanvasCenter().x,
+            top: this.getCanvasCenter().y,
+            fontFamily: "Microsoft YaHei",
+            fontSize: 16,
+            fill: "#333333",
+            charSpacing: 0,
+            lineHeight: 1.16,
+            originX: "center",
+            originY: "center",
+          });
+          this.canvas.add(text);
+          this.canvas.setActiveObject(text);
+          this._updateDefaultTicketCount();
+        },
+        addSerial() {
+          const serial = new fabric.IText("No.0001", {
+            left: this.getCanvasCenter().x,
+            top: this.getCanvasCenter().y,
+            fontFamily: "Arial",
+            fontSize: 16,
+            fill: "#dc3545",
+            fontWeight: "bold",
+            isSerial: true,
+            serialRules: { prefix: "No.", suffix: "", start: 1, step: 1, digits: 4, repeat: 1 },
+            charSpacing: 0,
+            lineHeight: 1.16,
+            originX: "center",
+            originY: "center",
+            editable: false,
+          });
+          this.canvas.add(serial);
+          this.canvas.setActiveObject(serial);
+          this._updateDefaultTicketCount();
+        },
+        addCurvedText() {
+          const canvasW = this.canvas.width;
+          const canvasH = this.canvas.height;
+          const defaultRadius = Math.min(canvasW, canvasH) * 0.4;
+          const curvedText = new CurvedText("环形文字示例", {
+            left: this.getCanvasCenter().x,
+            top: this.getCanvasCenter().y,
+            radius: defaultRadius,
+            spacing: 12,
+            centerAngle: 270,
+            fontSize: 20,
+            fontFamily: "Microsoft YaHei",
+            fontWeight: "bold",
+            fill: "#333333",
+            originX: "center",
+            originY: "center",
+          });
+          this.canvas.add(curvedText);
+          this.canvas.setActiveObject(curvedText);
+          this._updateDefaultTicketCount();
+        },
+        addRect() {
+          const rect = new fabric.Rect({
+            left: this.getCanvasCenter().x,
+            top: this.getCanvasCenter().y,
+            width: 60,
+            height: 40,
+            fill: "transparent",
+            stroke: "#333333",
+            strokeWidth: 1,
+            strokeUniform: true,
+            rx: 0,
+            ry: 0,
+            baseRadius: 0,
+            strokeDashArray: null,
+            originX: "center",
+            originY: "center",
+          });
+          this.canvas.add(rect);
+          this.canvas.setActiveObject(rect);
+        },
+        addCircle() {
+          const circle = new fabric.Circle({
+            left: this.getCanvasCenter().x,
+            top: this.getCanvasCenter().y,
+            radius: 30,
+            fill: "transparent",
+            stroke: "#333333",
+            strokeWidth: 1,
+            strokeUniform: true,
+            originX: "center",
+            originY: "center",
+          });
+          this.canvas.add(circle);
+          this.canvas.setActiveObject(circle);
+        },
+        addTriangle() {
+          const triangle = new fabric.Triangle({
+            left: this.getCanvasCenter().x,
+            top: this.getCanvasCenter().y,
+            width: 60,
+            height: 60,
+            fill: "transparent",
+            stroke: "#333333",
+            strokeWidth: 1,
+            strokeUniform: true,
+            originX: "center",
+            originY: "center",
+          });
+          this.canvas.add(triangle);
+          this.canvas.setActiveObject(triangle);
+        },
+        addStar() {
+          const points = [];
+          const outerRadius = 30;
+          const innerRadius = outerRadius * 0.381966;
+
+          for (let i = 0; i < 10; i++) {
+            const radius = i % 2 === 0 ? outerRadius : innerRadius;
+            const angle = (Math.PI * 2 * i) / 10 - Math.PI / 2;
+            points.push({
+              x: radius * Math.cos(angle),
+              y: radius * Math.sin(angle),
+            });
+          }
+
+          const star = new fabric.Polygon(points, {
+            left: this.getCanvasCenter().x,
+            top: this.getCanvasCenter().y,
+            fill: "#ff0000",
+            stroke: "transparent",
+            strokeWidth: 0,
+            strokeUniform: true,
+            objectCaching: false,
+            originY: "center",
+          });
+
+          this.canvas.add(star);
+          this.canvas.setActiveObject(star);
+          this.canvas.requestRenderAll();
+        },
+        addDiamond() {
+          const points = [
+            { x: 0, y: -40 },
+            { x: 40, y: 0 },
+            { x: 0, y: 40 },
+            { x: -40, y: 0 },
+          ];
+          const diamond = new fabric.Polygon(points, {
+            left: this.getCanvasCenter().x,
+            top: this.getCanvasCenter().y,
+            fill: "transparent",
+            stroke: "#333333",
+            strokeWidth: 1,
+            strokeUniform: true,
+            objectCaching: false,
+            originX: "center",
+            originY: "center",
+          });
+          this.canvas.add(diamond);
+          this.canvas.setActiveObject(diamond);
+        },
+        addLine() {
+          const line = new fabric.Line([0, 0, 100, 0], {
+            left: this.getCanvasCenter().x,
+            top: this.getCanvasCenter().y,
+            stroke: "#333333",
+            strokeWidth: 1,
+            strokeDashArray: null,
+
+            originX: "left",
+            originY: "center",
+          });
+          this.canvas.add(line);
+          this.canvas.setActiveObject(line);
+        },
+        deleteActiveObject() {
+          const active = this.canvas.getActiveObjects();
+          if (active.length) {
+            this.canvas.discardActiveObject();
+            active.forEach((obj) => this.canvas.remove(obj));
+            this.canvas.requestRenderAll();
+            this._updateDefaultTicketCount();
+            if (this.state.mode === "preview") this.generatePreview();
+          }
+        },
+        fitImageToCanvas() {
+          const obj = this.canvas.getActiveObject();
+          if (!obj || obj.type !== "image") {
+            showToast("请先选择一张图片");
+            return;
+          }
+          const targetW = this.state.ticketSize.w * MM_TO_PX;
+          const targetH = this.state.ticketSize.h * MM_TO_PX;
+          obj.set({
+            scaleX: targetW / obj.width,
+            scaleY: targetH / obj.height,
+            left: targetW / 2,
+            top: targetH / 2,
+            originX: "center",
+            originY: "center",
+          });
+          this.canvas.requestRenderAll();
+          if (this.state.mode === "preview") this.generatePreview();
+          this.saveHistory();
+        },
+        bindLayerControls() {
+          const moveLayer = (action) => {
+            const obj = this.canvas.getActiveObject();
+            if (!obj) return;
+            if (action === "front") this.canvas.bringToFront(obj);
+            if (action === "back") this.canvas.sendToBack(obj);
+            if (action === "up") this.canvas.bringForward(obj);
+            if (action === "down") this.canvas.sendBackward(obj);
+            this.canvas.requestRenderAll();
+            if (this.state.mode === "preview") this.generatePreview();
+            this.saveHistory();
+          };
+          document.getElementById("btn-layer-front").onclick = () => moveLayer("front");
+          document.getElementById("btn-layer-back").onclick = () => moveLayer("back");
+          document.getElementById("btn-layer-up").onclick = () => moveLayer("up");
+          document.getElementById("btn-layer-down").onclick = () => moveLayer("down");
+        },
+        bindPropPanelEvents() {
+          const ui = {
+            panel: document.getElementById("properties-panel"),
+            emptyState: document.getElementById("empty-selection-state"),
+            btnDel: document.getElementById("btn-del-obj"),
+            groupControls: document.getElementById("group-controls"),
+            btnGroup: document.getElementById("btn-group"),
+            btnUngroup: document.getElementById("btn-ungroup"),
+            alignControls: document.getElementById("align-controls"),
+            // ... other references ...
+            x: document.getElementById("prop-x"),
+            y: document.getElementById("prop-y"),
+            w: document.getElementById("prop-w"),
+            h: document.getElementById("prop-h"),
+            angle: document.getElementById("prop-angle"),
+            btnLockAspect: document.getElementById("btn-lock-aspect"),
+            shapeGroup: document.getElementById("props-shape-group"),
+            shapeNonLineOnly: document.querySelectorAll(".shape-non-line-only"),
+            shapeRectOnly: document.querySelectorAll(".shape-rect-only"),
+            shapeFill: document.getElementById("prop-shape-fill"),
+            shapeFillTrans: document.getElementById("prop-shape-fill-trans"),
+            shapeStroke: document.getElementById("prop-shape-stroke"),
+            shapeStrokeWidth: document.getElementById("prop-shape-stroke-width"),
+            shapeStrokeStyle: document.getElementById("prop-shape-stroke-style"),
+            dashSettings: document.getElementById("prop-stroke-dash-settings"),
+            dashLen: document.getElementById("prop-dash-len"),
+            dashGap: document.getElementById("prop-dash-gap"),
+            shapeRx: document.getElementById("prop-shape-rx"),
+            assetGroup: document.getElementById("props-asset-group"),
+            assetColor: document.getElementById("prop-asset-color"),
+            imageGroup: document.getElementById("props-image-group"),
+            textGroup: document.getElementById("props-text-group"),
+            content: document.getElementById("prop-content"),
+            family: document.getElementById("prop-font-family"),
+            size: document.getElementById("prop-font-size"),
+            bold: document.getElementById("prop-bold"),
+            italic: document.getElementById("prop-italic"),
+            underline: document.getElementById("prop-underline"),
+            alignLeft: document.getElementById("align-left"),
+            alignCenter: document.getElementById("align-center"),
+            alignRight: document.getElementById("align-right"),
+            alignJustify: document.getElementById("align-justify"),
+            charSpacing: document.getElementById("prop-char-spacing"),
+            lineHeight: document.getElementById("prop-line-height"),
+            fill: document.getElementById("prop-fill"),
+            bgColor: document.getElementById("prop-text-bg-color"),
+            bgTrans: document.getElementById("prop-text-bg-transparent"),
+            curvedGroup: document.getElementById("props-curved-group"),
+            curvedRadius: document.getElementById("prop-curved-radius"),
+            curvedAngle: document.getElementById("prop-curved-angle"),
+            valCurvedRadius: document.getElementById("val-curved-radius"),
+            valCurvedAngle: document.getElementById("val-curved-angle"),
+            btnUpdateCurved: document.getElementById("btn-update-curved"),
+            serialGroup: document.getElementById("props-serial-group"),
+            sPrefix: document.getElementById("prop-ser-prefix"),
+            sSuffix: document.getElementById("prop-ser-suffix"),
+            sStart: document.getElementById("prop-ser-start"),
+            sStep: document.getElementById("prop-ser-step"),
+            sDigits: document.getElementById("prop-ser-digits"),
+            sRepeat: document.getElementById("prop-ser-repeat"),
+            opacity: document.getElementById("prop-opacity"),
+            valOpacity: document.getElementById("val-opacity"),
+          };
+
+          // 宽高比例锁定状态
+          let aspectLocked = false;
+          let aspectRatio = 1;
+
+          const debouncedUpdateCurvedText = debounce(() => {
+            updateCurvedText();
+          }, 300);
+
+          const updateUI = () => {
+            const obj = this.canvas.getActiveObject();
+            const activeObjects = this.canvas.getActiveObjects(); // Multi-select support
+
+            if (!obj && activeObjects.length === 0) {
+              ui.panel.classList.add("d-none");
+              ui.emptyState.classList.remove("d-none");
+              ui.btnDel.classList.add("d-none");
+              ui.groupControls.classList.add("d-none");
+              ui.alignControls.classList.add("d-none");
+              return;
+            }
+
+            if (ui.opacity) {
+              const target = this.canvas.getActiveObject() || this.canvas.getActiveObjects()[0];
+              const currentOpacity = target ? Math.round((target.opacity ?? 1) * 100) : 100;
+              ui.opacity.value = currentOpacity;
+              ui.valOpacity.innerText = currentOpacity + "%";
+            }
+
+            ui.panel.classList.remove("d-none");
+            ui.emptyState.classList.add("d-none");
+
+            // 选中多个对象的情况
+            if (activeObjects.length > 1) {
+              ui.btnDel.classList.remove("d-none");
+              ui.groupControls.classList.remove("d-none");
+              ui.btnGroup.classList.remove("d-none");
+              ui.btnUngroup.classList.add("d-none");
+              ui.alignControls.classList.remove("d-none");
+              ui.shapeGroup.classList.add("d-none");
+              ui.textGroup.classList.add("d-none");
+              ui.imageGroup.classList.add("d-none");
+              ui.serialGroup.classList.add("d-none");
+              ui.assetGroup.classList.add("d-none");
+              ui.curvedGroup.classList.add("d-none");
+            }
+            // 选中单个对象的情况
+            else {
+              ui.btnDel.classList.remove("d-none");
+              ui.alignControls.classList.add("d-none"); // 单个不显示对齐分布
+
+              // 编组/解组逻辑
+              if (obj.type === "group") {
+                ui.groupControls.classList.remove("d-none");
+                ui.btnGroup.classList.add("d-none");
+                ui.btnUngroup.classList.remove("d-none");
+              } else {
+                ui.groupControls.classList.add("d-none");
+              }
+
+              ui.x.value = (obj.left / MM_TO_PX).toFixed(1);
+              ui.y.value = (obj.top / MM_TO_PX).toFixed(1);
+              ui.w.value = (obj.getScaledWidth() / MM_TO_PX).toFixed(1);
+              ui.h.value = (obj.getScaledHeight() / MM_TO_PX).toFixed(1);
+
+              // 更新当前对象的宽高比例
+              const currentW = parseFloat(ui.w.value);
+              const currentH = parseFloat(ui.h.value);
+              if (currentH > 0) {
+                aspectRatio = currentW / currentH;
+              }
+
+              // 如果当前是锁定状态，应用控制点限制
+              if (aspectLocked) {
+                obj.setControlVisible("ml", false);
+                obj.setControlVisible("mr", false);
+                obj.setControlVisible("mt", false);
+                obj.setControlVisible("mb", false);
+              } else {
+                obj.setControlVisible("ml", true);
+                obj.setControlVisible("mr", true);
+                obj.setControlVisible("mt", true);
+                obj.setControlVisible("mb", true);
+              }
+
+              ui.angle.value = Math.round(obj.angle);
+
+              ui.h.disabled = obj.type === "line";
+              ui.shapeGroup.classList.add("d-none");
+              ui.textGroup.classList.add("d-none");
+              ui.serialGroup.classList.add("d-none");
+              ui.assetGroup.classList.add("d-none");
+              ui.imageGroup.classList.add("d-none");
+              ui.curvedGroup.classList.add("d-none");
+
+              if (obj.isAsset) {
+                ui.assetGroup.classList.remove("d-none");
+                ui.assetColor.value = obj.assetColor || "#000000";
+              }
+
+              if (obj.type === "image") {
+                ui.imageGroup.classList.remove("d-none");
+              }
+
+              if (obj.isCurvedText) {
+                ui.textGroup.classList.remove("d-none");
+                ui.curvedGroup.classList.remove("d-none");
+                ui.content.value = obj.curvedText || "";
+                ui.curvedRadius.value = parseInt(obj.curvedRadius) || 100;
+                ui.valCurvedRadius.innerText = ui.curvedRadius.value;
+                ui.curvedAngle.value = obj.curvedCenterAngle || 270;
+                ui.valCurvedAngle.innerText = ui.curvedAngle.value;
+                ui.charSpacing.value = obj.curvedSpacing || 12;
+                ui.family.value = obj.curvedFontFamily || "Microsoft YaHei";
+                ui.size.value = obj.curvedFontSize || 32;
+                ui.fill.value = obj.curvedFill || "#333333";
+                ui.bold.checked = obj.curvedFontWeight === "bold";
+                return;
+              }
+
+              const shapeTypes = ["rect", "line", "triangle", "circle", "polygon"];
+              if (shapeTypes.includes(obj.type)) {
+                ui.shapeGroup.classList.remove("d-none");
+                ui.shapeStroke.value = obj.stroke || "#000000";
+                ui.shapeStrokeWidth.value = obj.strokeWidth || 0;
+                const hasDash = obj.type === "rect" || obj.type === "line";
+                ui.shapeRectOnly.forEach((el) => {
+                  if (hasDash) el.classList.remove("d-none");
+                  else el.classList.add("d-none");
+                });
+                const hasFill = obj.type !== "line";
+                ui.shapeNonLineOnly.forEach((el) => {
+                  if (hasFill) el.classList.remove("d-none");
+                  else el.classList.add("d-none");
+                });
+                if (hasDash) {
+                  const isDashed = obj.strokeDashArray && obj.strokeDashArray.length >= 2;
+                  ui.shapeStrokeStyle.value = isDashed ? "dashed" : "solid";
+                  if (obj.type === "rect") {
+                    if (isDashed) {
+                      ui.dashSettings.classList.remove("d-none");
+                      ui.dashLen.value = obj.strokeDashArray[0];
+                      ui.dashGap.value = obj.strokeDashArray[1];
+                    } else {
+                      ui.dashSettings.classList.add("d-none");
+                    }
+                  }
+                }
+                if (hasFill) {
+                  if (obj.fill && obj.fill !== "transparent") {
+                    ui.shapeFill.value = obj.fill;
+                    ui.shapeFillTrans.checked = false;
+                  } else {
+                    ui.shapeFill.value = "#ffffff";
+                    ui.shapeFillTrans.checked = true;
+                  }
+                  if (obj.type === "rect") {
+                    ui.shapeRx.value = obj.rx || 0;
+                    const currentR = obj.baseRadius !== undefined ? obj.baseRadius : obj.rx * obj.scaleX;
+                    ui.shapeRx.value = Math.round(currentR);
+                  }
+                }
+              }
+
+              if (obj.type === "i-text" || obj.type === "text" || obj.type === "textbox") {
+                ui.textGroup.classList.remove("d-none");
+                ui.content.value = obj.text;
+                ui.family.value = obj.fontFamily;
+                ui.size.value = obj.fontSize;
+                ui.fill.value = obj.fill;
+                ui.bold.checked = obj.fontWeight === "bold";
+                ui.italic.checked = obj.fontStyle === "italic";
+                ui.underline.checked = !!obj.underline;
+
+                const alignVal = obj.textAlign || "left";
+                if (alignVal === "left") ui.alignLeft.checked = true;
+                else if (alignVal === "center") ui.alignCenter.checked = true;
+                else if (alignVal === "right") ui.alignRight.checked = true;
+                else ui.alignJustify.checked = true;
+
+                ui.charSpacing.value = obj.charSpacing || 0;
+                ui.lineHeight.value = obj.lineHeight || 1.16;
+
+                if (obj.backgroundColor) {
+                  ui.bgColor.value = obj.backgroundColor;
+                  ui.bgTrans.checked = true;
+                } else {
+                  ui.bgColor.value = "#dddddd";
+                  ui.bgTrans.checked = false;
+                }
+
+                if (obj.isSerial) {
+                  ui.serialGroup.classList.remove("d-none");
+                  ui.content.disabled = true;
+                  const r = obj.serialRules || {};
+                  ui.sPrefix.value = r.prefix;
+                  ui.sSuffix.value = r.suffix;
+                  ui.sStart.value = r.start;
+                  ui.sStep.value = r.step;
+                  ui.sDigits.value = r.digits;
+                  ui.sRepeat.value = r.repeat;
+                } else {
+                  ui.serialGroup.classList.add("d-none");
+                  ui.content.disabled = false;
+                }
+              }
+            }
+          };
+          this.canvas.on("selection:created", updateUI);
+          this.canvas.on("selection:updated", updateUI);
+          this.canvas.on("selection:cleared", updateUI);
+          this.canvas.on("object:modified", () => {
+            updateUI();
+            if (this.state.mode === "preview") this.generatePreview();
+          });
+
+          ui.assetColor.oninput = (e) => {
+            const obj = this.canvas.getActiveObject();
+            if (obj && obj.isAsset) {
+              this._setAssetColor(obj, e.target.value);
+              this.canvas.requestRenderAll();
+              if (this.state.mode === "preview") this.generatePreview();
+              this.saveHistory();
+            }
+          };
+          const setProp = (key, val) => {
+            const obj = this.canvas.getActiveObject();
+            if (!obj) return;
+            obj.set(key, val);
+            this.canvas.requestRenderAll();
+            if (this.state.mode === "preview") this.generatePreview();
+            this.saveHistory();
+          };
+          const updateDashArray = () => {
+            const style = ui.shapeStrokeStyle.value;
+            if (style === "solid") {
+              setProp("strokeDashArray", null);
+              ui.dashSettings.classList.add("d-none");
+            } else {
+              const len = parseFloat(ui.dashLen.value) || 5;
+              const gap = parseFloat(ui.dashGap.value) || 5;
+              setProp("strokeDashArray", [len, gap]);
+              ui.dashSettings.classList.remove("d-none");
+            }
+          };
+          ui.x.oninput = (e) => setProp("left", parseFloat(e.target.value) * MM_TO_PX);
+          ui.y.oninput = (e) => setProp("top", parseFloat(e.target.value) * MM_TO_PX);
+          ui.opacity.oninput = (e) => {
+            const val = parseInt(e.target.value) / 100; // 转成 0~1
+            const obj = this.canvas.getActiveObject();
+            if (!obj) return;
+
+            const activeObjects = this.canvas.getActiveObjects();
+            activeObjects.forEach((o) => {
+              o.set("opacity", val);
+            });
+
+            this.canvas.requestRenderAll();
+            ui.valOpacity.innerText = e.target.value + "%";
+
+            if (this.state.mode === "preview") this.generatePreview();
+            this.saveHistory();
+          };
+
+          ui.w.oninput = (e) => {
+            const val = parseFloat(e.target.value);
+            if (!val) return;
+            const obj = this.canvas.getActiveObject();
+            if (!obj) return;
+            const targetW = val * MM_TO_PX;
+            obj.set({ scaleX: targetW / obj.width });
+
+            // 如果锁定了比例，同时调整高度
+            if (aspectLocked && aspectRatio) {
+              const newH = val / aspectRatio;
+              ui.h.value = newH.toFixed(1);
+              const targetH = newH * MM_TO_PX;
+              obj.set({ scaleY: targetH / obj.height });
+            }
+
+            this.canvas.requestRenderAll();
+            if (this.state.mode === "preview") this.generatePreview();
+            this.saveHistory();
+          };
+          ui.h.oninput = (e) => {
+            const val = parseFloat(e.target.value);
+            if (!val) return;
+            const obj = this.canvas.getActiveObject();
+            if (!obj) return;
+            const targetH = val * MM_TO_PX;
+            obj.set({ scaleY: targetH / obj.height });
+
+            // 如果锁定了比例，同时调整宽度
+            if (aspectLocked && aspectRatio) {
+              const newW = val * aspectRatio;
+              ui.w.value = newW.toFixed(1);
+              const targetW = newW * MM_TO_PX;
+              obj.set({ scaleX: targetW / obj.width });
+            }
+
+            this.canvas.requestRenderAll();
+            if (this.state.mode === "preview") this.generatePreview();
+            this.saveHistory();
+          };
+          ui.angle.oninput = (e) => {
+            const val = parseFloat(e.target.value);
+            if (isNaN(val)) return;
+            setProp("angle", val);
+          };
+
+          ui.shapeFill.oninput = (e) => setProp("fill", e.target.value);
+          ui.shapeFillTrans.onchange = (e) => {
+            setProp("fill", e.target.checked ? null : ui.shapeFill.value);
+          };
+          ui.shapeStroke.oninput = (e) => setProp("stroke", e.target.value);
+          ui.shapeStrokeWidth.oninput = (e) => {
+            const val = parseFloat(e.target.value);
+            setProp("strokeWidth", isNaN(val) ? 0 : val);
+          };
+          ui.shapeStrokeStyle.onchange = updateDashArray;
+          ui.dashLen.oninput = updateDashArray;
+          ui.dashGap.oninput = updateDashArray;
+          ui.shapeRx.oninput = (e) => {
+            const val = parseInt(e.target.value) || 0;
+            const obj = this.canvas.getActiveObject();
+            if (!obj || obj.type !== "rect") return;
+            obj.set("baseRadius", val);
+            obj.set({ rx: val / obj.scaleX, ry: val / obj.scaleY });
+            this.canvas.requestRenderAll();
+            if (this.state.mode === "preview") this.generatePreview();
+            this.saveHistory();
+          };
+
+          ui.content.oninput = (e) => {
+            const obj = this.canvas.getActiveObject();
+            if (obj && obj.isCurvedText) {
+              debouncedUpdateCurvedText();
+            } else {
+              setProp("text", e.target.value);
+            }
+          };
+
+          ui.family.onchange = (e) => setProp("fontFamily", e.target.value);
+          ui.size.oninput = (e) => setProp("fontSize", parseInt(e.target.value));
+          ui.fill.oninput = (e) => setProp("fill", e.target.value);
+          ui.bold.onchange = (e) => setProp("fontWeight", e.target.checked ? "bold" : "normal");
+          ui.italic.onchange = (e) => setProp("fontStyle", e.target.checked ? "italic" : "normal");
+          ui.underline.onchange = (e) => setProp("underline", e.target.checked);
+
+          [ui.alignLeft, ui.alignCenter, ui.alignRight, ui.alignJustify].forEach((btn) => {
+            btn.addEventListener("change", (e) => {
+              if (e.target.checked) {
+                setProp("textAlign", e.target.value);
+              }
+            });
+          });
+
+          ui.charSpacing.oninput = (e) => {
+            const val = parseInt(e.target.value);
+            const obj = this.canvas.getActiveObject();
+            if (obj && obj.isCurvedText) {
+              debouncedUpdateCurvedText();
+            } else {
+              setProp("charSpacing", isNaN(val) ? 0 : val);
+            }
+          };
+
+          ui.lineHeight.oninput = (e) => {
+            const val = parseFloat(e.target.value);
+            setProp("lineHeight", isNaN(val) ? 1.16 : val);
+          };
+
+          const updateBg = () => {
+            const isTrans = ui.bgTrans.checked;
+            const color = ui.bgColor.value;
+            ui.bgColor.disabled = !isTrans;
+            setProp("backgroundColor", !isTrans ? "" : color);
+          };
+          ui.bgColor.oninput = updateBg;
+          ui.bgTrans.onchange = updateBg;
+
+          const updateSerial = () => {
+            const obj = this.canvas.getActiveObject();
+            if (!obj || !obj.isSerial) return;
+            const r = {
+              prefix: ui.sPrefix.value,
+              suffix: ui.sSuffix.value,
+              start: parseInt(ui.sStart.value) || 1,
+              step: parseInt(ui.sStep.value) || 1,
+              digits: parseInt(ui.sDigits.value) || 1,
+              repeat: parseInt(ui.sRepeat.value) || 1,
+            };
+            obj.serialRules = r;
+            obj.text = this.generateSerialString(r, 0);
+            ui.content.value = obj.text;
+            this.canvas.requestRenderAll();
+            if (this.state.mode === "preview") this.generatePreview();
+            this.saveHistory();
+          };
+          [ui.sPrefix, ui.sSuffix, ui.sStart, ui.sStep, ui.sDigits, ui.sRepeat].forEach((el) => {
+            el.addEventListener("input", debounce(updateSerial, 200));
+          });
+
+          const updateCurvedText = () => {
+            const oldObj = this.canvas.getActiveObject();
+            if (!oldObj || !oldObj.isCurvedText) return;
+
+            const text = ui.content.value.trim() || " ";
+            const radius = parseInt(ui.curvedRadius.value) || 100;
+            const spacing = parseInt(ui.charSpacing.value) || 12;
+            const centerAngle = parseInt(ui.curvedAngle.value) || 270;
+            const fontSize = parseInt(ui.size.value) || 32;
+            const fontFamily = ui.family.value || "Microsoft YaHei";
+            const fontWeight = ui.bold.checked ? "bold" : "normal";
+            const fill = ui.fill.value || "#333333";
+
+            // 保存旧对象的变换信息
+            const oldScaleX = oldObj.scaleX || 1;
+            const oldScaleY = oldObj.scaleY || 1;
+            const oldAngle = oldObj.angle || 0;
+            const oldLeft = oldObj.left;
+            const oldTop = oldObj.top;
+
+            // 计算旧对象的圆心位置
+            const oldOffset = oldObj.anchorOffset || { x: 0, y: 0 };
+            const rads = fabric.util.degreesToRadians(oldAngle);
+            const cos = Math.cos(rads);
+            const sin = Math.sin(rads);
+
+            const vecX = oldOffset.x * oldScaleX;
+            const vecY = oldOffset.y * oldScaleY;
+
+            const circleCenterX = oldLeft + (vecX * cos - vecY * sin);
+            const circleCenterY = oldTop + (vecX * sin + vecY * cos);
+
+            // 创建新对象
+            const newObj = new CurvedText(text, {
+              left: 0,
+              top: 0,
+              radius: radius,
+              spacing: spacing,
+              centerAngle: centerAngle,
+              fontSize: fontSize,
+              fontFamily: fontFamily,
+              fontWeight: fontWeight,
+              fill: fill,
+            });
+
+            // 应用相同的变换
+            newObj.scaleX = oldScaleX;
+            newObj.scaleY = oldScaleY;
+            newObj.angle = oldAngle;
+
+            // 计算新对象应该放置的位置以保持圆心不变
+            const newOffset = newObj.anchorOffset || { x: 0, y: 0 };
+            const nVecX = newOffset.x * newObj.scaleX;
+            const nVecY = newOffset.y * newObj.scaleY;
+
+            const nShiftX = nVecX * cos - nVecY * sin;
+            const nShiftY = nVecX * sin + nVecY * cos;
+
+            newObj.left = circleCenterX - nShiftX;
+            newObj.top = circleCenterY - nShiftY;
+
+            // 确保坐标正确更新
+            newObj.setCoords();
+
+            this.canvas.remove(oldObj);
+            this.canvas.add(newObj);
+            this.canvas.setActiveObject(newObj);
+            this.canvas.requestRenderAll();
+            if (this.state.mode === "preview") this.generatePreview();
+            this.saveHistory();
+          };
+
+          ui.curvedRadius.oninput = (e) => {
+            ui.valCurvedRadius.innerText = e.target.value;
+            updateCurvedText();
+          };
+          ui.curvedAngle.oninput = (e) => {
+            ui.valCurvedAngle.innerText = e.target.value;
+            updateCurvedText();
+          };
+
+          ui.btnUpdateCurved.onclick = updateCurvedText;
+          [ui.size, ui.family, ui.fill, ui.bold].forEach((el) => {
+            el.addEventListener("input", debouncedUpdateCurvedText);
+          });
+
+          // 锁定宽高比例按钮
+          ui.btnLockAspect.onclick = () => {
+            aspectLocked = !aspectLocked;
+            const icon = ui.btnLockAspect.querySelector("i");
+            const obj = this.canvas.getActiveObject();
+
+            if (aspectLocked) {
+              // 锁定状态 - 显示锁定图标并高亮按钮
+              icon.className = "bi bi-lock-fill";
+              ui.btnLockAspect.classList.add("btn-primary");
+              ui.btnLockAspect.classList.remove("border");
+              ui.btnLockAspect.title = "解锁宽高比例";
+
+              // 保存当前比例
+              if (obj) {
+                const currentW = parseFloat(ui.w.value);
+                const currentH = parseFloat(ui.h.value);
+                if (currentH > 0) {
+                  aspectRatio = currentW / currentH;
+                }
+
+                // 限制只能使用四个角的控制点进行缩放
+                obj.setControlVisible("ml", false); // 左中
+                obj.setControlVisible("mr", false); // 右中
+                obj.setControlVisible("mt", false); // 上中
+                obj.setControlVisible("mb", false); // 下中
+
+                // 四个角的控制点保持可见
+                obj.setControlVisible("tl", true); // 左上
+                obj.setControlVisible("tr", true); // 右上
+                obj.setControlVisible("bl", true); // 左下
+                obj.setControlVisible("br", true); // 右下
+
+                this.canvas.requestRenderAll();
+              }
+            } else {
+              // 解锁状态 - 显示解锁图标并恢复普通样式
+              icon.className = "bi bi-unlock";
+              ui.btnLockAspect.classList.remove("btn-primary");
+              ui.btnLockAspect.classList.add("border");
+              ui.btnLockAspect.title = "锁定宽高比例";
+
+              // 恢复所有控制点
+              if (obj) {
+                obj.setControlVisible("ml", true);
+                obj.setControlVisible("mr", true);
+                obj.setControlVisible("mt", true);
+                obj.setControlVisible("mb", true);
+                obj.setControlVisible("tl", true);
+                obj.setControlVisible("tr", true);
+                obj.setControlVisible("bl", true);
+                obj.setControlVisible("br", true);
+
+                this.canvas.requestRenderAll();
+              }
+            }
+          };
+
+          ui.btnDel.onclick = () => this.deleteActiveObject();
+        },
+
+        generateSerialString(rules, index) {
+          const logicalIndex = Math.floor(index / rules.repeat);
+          const val = rules.start + logicalIndex * rules.step;
+          return `${rules.prefix}${val.toString().padStart(rules.digits, "0")}${rules.suffix}`;
+        },
+
+        generatePreview() {
+          const root = document.getElementById("preview-list");
+          requestAnimationFrame(() => {
+            this._renderPreviewDOM(root);
+          });
+        },
+
+        async _renderPreviewDOM(root) {
+          if (this.previewObjectUrls && this.previewObjectUrls.length > 0) {
+            this.previewObjectUrls.forEach((url) => URL.revokeObjectURL(url));
+            this.previewObjectUrls = [];
+          }
+
+          root.innerHTML = '<div style="padding: 40px; color: #666;"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">正在渲染，请稍候...</div></div>';
+
+          const colorInput = document.getElementById("cfg-canvas-bg");
+          const sheetBgColor = colorInput.value;
+          const objects = this.canvas.getObjects();
+          const serialObjs = objects.filter((o) => o.isSerial);
+          const hasSerials = serialObjs.length > 0;
+          this.canvas.discardActiveObject();
+          this.canvas.requestRenderAll();
+
+          const { rows, cols, marginT, marginB, marginL, marginR, gapX, gapY } = this.state.layout;
+          const perPage = rows * cols;
+          const totalInput = document.getElementById("cfg-print-total");
+          const totalTickets = parseInt(totalInput?.value) || perPage;
+          const totalPages = Math.ceil(totalTickets / perPage);
+          document.getElementById("preview-total-count").innerText = totalTickets;
+          document.getElementById("preview-total-pages").innerText = totalPages;
+
+          let htmlItems = [];
+          const paper = this.state.paperSize;
+          const ticket = this.state.ticketSize;
+
+          const originalBg = this.canvas.backgroundColor;
+
+          try {
+            if (!hasSerials) {
+              const blob = await new Promise((resolve) => this.canvas.toCanvasElement(3).toBlob(resolve));
+              const url = URL.createObjectURL(blob);
+              this.previewObjectUrls.push(url);
+              for (let i = 0; i < totalTickets; i++) {
+                htmlItems.push({ index: i, url: url });
+              }
+            } else {
+              serialObjs.forEach((o) => (o.visible = true));
+              for (let i = 0; i < totalTickets; i++) {
+                serialObjs.forEach((obj) => {
+                  obj.set("text", this.generateSerialString(obj.serialRules, i));
+                });
+                this.canvas.renderAll();
+                const blob = await new Promise((resolve) => this.canvas.toCanvasElement(3).toBlob(resolve));
+                const url = URL.createObjectURL(blob);
+                this.previewObjectUrls.push(url);
+                htmlItems.push({ index: i, url: url });
+                if (i % 5 === 0) {
+                  document.getElementById("preview-total-count").innerText = `渲染中 ${i + 1}/${totalTickets}`;
+                }
+              }
+              serialObjs.forEach((obj) => {
+                obj.set("text", this.generateSerialString(obj.serialRules, 0));
+              });
+              this.canvas.requestRenderAll();
+            }
+          } catch (e) {
+            console.error("渲染失败", e);
+            root.innerHTML = '<div class="text-danger">渲染失败: ' + e.message + "</div>";
+            return;
+          }
+
+          const cssVars = `
+            --pw: ${paper.w}mm; --ph: ${paper.h}mm;
+            --mt: ${marginT}mm; --ml: ${marginL}mm;
+            --tw: ${ticket.w}mm; --th: ${ticket.h}mm;
+            --gx: ${gapX}mm; --gy: ${gapY}mm;
+            --sheet-bg: ${sheetBgColor};
+        `;
+          const cutColor = "dashed red";
+          const showCutLines = document.getElementById("cfg-show-cutlines").checked;
+
+          let finalHtml = "";
+
+          for (let p = 0; p < totalPages; p++) {
+            let pageContent = "";
+            for (let i = 0; i < perPage; i++) {
+              const globalIdx = p * perPage + i;
+              if (globalIdx >= htmlItems.length) break;
+
+              const itemData = htmlItems[globalIdx];
+              const r = Math.floor(i / cols);
+              const c = i % cols;
+              let bTop = "none",
+                bBottom = "none",
+                bLeft = "none",
+                bRight = "none";
+              if (showCutLines) {
+                if (!(r === 0 && marginT === 0)) bTop = `1px ${cutColor}`;
+                if (!(r === rows - 1 && marginB === 0)) bBottom = `1px ${cutColor}`;
+                if (!(c === 0 && marginL === 0)) bLeft = `1px ${cutColor}`;
+                if (!(c === cols - 1 && marginR === 0)) bRight = `1px ${cutColor}`;
+              }
+
+              pageContent += `
+              <div class="p-item" style="
+                  width: var(--tw); height: var(--th);
+                  margin-right: var(--gx); margin-bottom: var(--gy);
+                  border-top: ${bTop}; border-bottom: ${bBottom};
+                  border-left: ${bLeft}; border-right: ${bRight};
+                  position: relative;
+              ">
+                <img src="${itemData.url}" style="width: 100%; height: 100%; display: block;" />
+              </div>
+            `;
+            }
+            finalHtml += `<div class="p-sheet" style="${cssVars}"><div class="p-grid">${pageContent}</div></div>`;
+          }
+
+          const style = `
+            <style>
+                .p-sheet {
+                    width: var(--pw); height: var(--ph);
+                    background-color: var(--sheet-bg); 
+                    margin: 0 auto 40px;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+                    page-break-after: always; overflow: hidden;
+                    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+                }
+                .p-grid {
+                    padding-top: var(--mt); padding-left: var(--ml);
+                    display: flex; flex-wrap: wrap; align-content: flex-start;
+                }
+                .p-item { 
+                    box-sizing: border-box; 
+                    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+                    overflow: hidden; 
+                }
+                @media print {
+                    body > * { display: none !important; }
+                    #print-container { display: block !important; }
+                    .p-sheet { box-shadow: none; margin: 0; border: none; }
+                }
+            </style>
+        `;
+
+          root.innerHTML = style + finalHtml;
+          document.getElementById("print-container").innerHTML = style + finalHtml;
+          document.getElementById("preview-total-count").innerText = totalTickets;
+        },
+
+        copy() {
+          const activeObj = this.canvas.getActiveObject();
+          if (!activeObj) return false;
+          activeObj.clone((cloned) => {
+            this.state.clipboard = cloned;
+          });
+          return true;
+        },
+
+        paste() {
+          if (!this.state.clipboard) return false;
+          this.state.clipboard.clone((clonedObj) => {
+            this.canvas.discardActiveObject();
+
+            clonedObj.set({
+              left: clonedObj.left + 20,
+              top: clonedObj.top + 20,
+              evented: true,
+            });
+
+            if (clonedObj.type === "activeSelection") {
+              clonedObj.canvas = this.canvas;
+              clonedObj.forEachObject((obj) => {
+                this.canvas.add(obj);
+              });
+              clonedObj.setCoords();
+            } else {
+              this.canvas.add(clonedObj);
+            }
+            this.canvas.setActiveObject(clonedObj);
+            this.canvas.requestRenderAll();
+            this.saveHistory();
+          });
+          return true;
+        },
+
+        saveProject() {
+          this.canvas.discardActiveObject();
+          this.canvas.requestRenderAll();
+          const json = {
+            version: "2.0",
+            ...this._extractFromDOM(FORM_SCHEMA.root),
+            layout: this._extractFromDOM(FORM_SCHEMA.layout),
+            borderSettings: this._extractFromDOM(FORM_SCHEMA.borderSettings),
+            objects: this.canvas.toJSON([
+              "isSerial",
+              "serialRules",
+              "excludeFromExport",
+              "baseRadius",
+              "strokeUniform",
+              "isCurvedText",
+              "curvedText",
+              "curvedRadius",
+              "curvedSpacing",
+              "curvedCenterAngle",
+              "curvedFontSize",
+              "curvedFontFamily",
+              "curvedFontWeight",
+              "curvedFill",
+              "charSpacing",
+              "lineHeight",
+              "underline",
+            ]),
+          };
+          const blob = new Blob([JSON.stringify(json)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `饭票设计-${new Date().toISOString().slice(0, 10)}.fpt`;
+          a.click();
+          URL.revokeObjectURL(url);
+          showToast("项目已保存");
+        },
+        openProject() {
+          const input = document.getElementById("file-open-project");
+          input.value = "";
+          input.click();
+        },
+        loadProject(file) {
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              const json = JSON.parse(e.target.result);
+              if (!json.version && !json.layout) throw new Error("无效的项目文件");
+              this._applyToDOM(FORM_SCHEMA.root, json);
+              this._applyToDOM(FORM_SCHEMA.layout, json.layout);
+              this._applyToDOM(FORM_SCHEMA.borderSettings, json.borderSettings);
+              if (document.getElementById("cfg-paper-size").value === "custom") {
+                document.getElementById("custom-paper-dims").style.display = "flex";
+              } else {
+                document.getElementById("custom-paper-dims").style.display = "none";
+              }
+              if (json.backgroundColor) {
+                this.canvas.backgroundColor = json.backgroundColor;
+                document.getElementById("cfg-canvas-bg").value = json.backgroundColor;
+              }
+              this.canvas.loadFromJSON(json.objects, () => {
+                const objects = this.canvas.getObjects();
+                objects.forEach((obj) => {
+                  obj.set({ originX: "center", originY: "center" });
+                });
+
+                this.canvas.requestRenderAll();
+                this.updateLayout();
+                this.saveHistory();
+              });
+            } catch (err) {
+              console.error(err);
+              showToast("加载项目失败: " + err.message);
+            }
+          };
+          reader.readAsText(file);
+        },
+        exportImage() {
+          if (this.state.mode !== "preview") this.generatePreview();
+          const previewContainer = document.getElementById("preview-list");
+          const sheets = previewContainer.querySelectorAll(".p-sheet");
+          if (sheets.length === 0) {
+            showToast("没有可导出的内容");
+            return;
+          }
+          sheets.forEach((sheet, index) => {
+            html2canvas(sheet, { scale: 4, useCORS: true, logging: false })
+              .then((canvas) => {
+                canvas.toBlob(
+                  (blob) => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `饭票导出_${index + 1}.jpg`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  },
+                  "image/jpeg",
+                  1.0,
+                );
+              })
+              .catch((error) => {
+                console.error(error);
+                showToast("导出图片失败: " + error.message);
+              });
+          });
+          showToast("图片导出已开始");
+        },
+        async exportPDF() {
+          const { jsPDF } = window.jspdf;
+          if (!jsPDF) {
+            showToast("PDF库未加载");
+            return;
+          }
+          showToast("正在生成PDF，请稍候...");
+          if (this.state.mode !== "preview") this.generatePreview();
+          const previewContainer = document.getElementById("preview-list");
+          const sheets = previewContainer.querySelectorAll(".p-sheet");
+          if (sheets.length === 0) {
+            showToast("没有可导出的内容");
+            return;
+          }
+          const doc = new jsPDF({
+            orientation: this.state.paperSize.w > this.state.paperSize.h ? "l" : "p",
+            unit: "mm",
+            format: [this.state.paperSize.w, this.state.paperSize.h],
+          });
+          try {
+            for (let i = 0; i < sheets.length; i++) {
+              const sheet = sheets[i];
+              const originalTransform = sheet.style.transform;
+              sheet.style.transform = "none";
+              const canvas = await html2canvas(sheet, { scale: 4, useCORS: true, logging: false });
+              sheet.style.transform = originalTransform;
+              const imgData = canvas.toDataURL("image/jpeg", 1.0);
+              if (i > 0) doc.addPage();
+              doc.addImage(imgData, "JPEG", 0, 0, this.state.paperSize.w, this.state.paperSize.h);
+            }
+            const fileName = `饭票导出_${new Date().toISOString().slice(0, 19).replace(/[-T:]/g, "")}.pdf`;
+            doc.save(fileName);
+            showToast("PDF导出成功");
+          } catch (error) {
+            console.error(error);
+            showToast("导出PDF失败: " + error.message);
+          }
+        },
+      };
+      window.onload = () => App.init();
+      document.getElementById("file-open-project").addEventListener("change", (e) => {
+        App.loadProject(e.target.files[0]);
+      });
+    </script>
+  </body>
+</html>

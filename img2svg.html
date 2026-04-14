@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Potrace 批量 SVG 矢量化工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- 引入 Potrace 核心库 -->
+    <script src="./potrace.js"></script>
+    <!-- 引入 JSZip 用于打包 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        input[type=range] { -webkit-appearance: none; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { 
+            -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; 
+            background: #4f46e5; cursor: pointer; margin-top: -7px; box-shadow: 0 0 2px rgba(0,0,0,0.2); 
+        }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 2px; cursor: pointer; background: #e2e8f0; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="bg-indigo-600 text-white p-2 rounded-lg">
+                    <i data-lucide="layers" class="w-5 h-5"></i>
+                </div>
+                <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
+                    Batch Vectorizer
+                </h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <span id="globalStats" class="text-sm text-slate-500 font-medium">准备就绪</span>
+                <button id="clearAllBtn" class="text-sm text-red-500 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors hidden">
+                    清空列表
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-5xl mx-auto px-4 py-8 w-full grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- 左侧：参数设置 -->
+        <div class="lg:col-span-4 space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-24">
+                <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <i data-lucide="sliders-horizontal" class="w-4 h-4 text-indigo-500"></i>
+                    算法参数
+                </h3>
+                
+                <div class="space-y-6">
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <label class="text-sm font-medium text-slate-700">色彩阈值</label>
+                            <span id="thresholdVal" class="text-xs font-mono text-indigo-600 bg-indigo-50 px-1.5 rounded">128</span>
+                        </div>
+                        <input type="range" id="threshold" min="0" max="255" value="128" class="w-full" />
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <label class="text-sm font-medium text-slate-700">平滑度 (Alpha)</label>
+                            <span id="alphaVal" class="text-xs font-mono text-indigo-600 bg-indigo-50 px-1.5 rounded">1.00</span>
+                        </div>
+                        <input type="range" id="alpha" min="0" max="130" value="100" class="w-full" />
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <label class="text-sm font-medium text-slate-700">杂点过滤 (Turd)</label>
+                            <span id="turdVal" class="text-xs font-mono text-indigo-600 bg-indigo-50 px-1.5 rounded">2</span>
+                        </div>
+                        <input type="range" id="turd" min="0" max="100" value="2" class="w-full" />
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-100">
+                        <label class="text-sm font-medium text-slate-700 block mb-2">全局填充颜色</label>
+                        <div class="flex gap-2">
+                            <input type="color" id="fillColor" value="#000000" class="w-10 h-10 rounded border-0 cursor-pointer" />
+                            <input type="text" id="colorHex" value="#000000" class="flex-grow text-sm border border-slate-200 rounded px-3 font-mono uppercase" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 space-y-3">
+                    <button id="downloadZipBtn" disabled class="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold transition-all shadow-lg shadow-indigo-100 disabled:opacity-30 disabled:shadow-none">
+                        <i data-lucide="archive" class="w-5 h-5"></i>
+                        打包下载全部 (.zip)
+                    </button>
+                    <button id="exportJsonBtn" disabled class="w-full flex items-center justify-center gap-2 bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 py-3 rounded-xl font-semibold transition-all disabled:opacity-30">
+                        <i data-lucide="file-json" class="w-5 h-5"></i>
+                        导出 JSON 配置
+                    </button>
+                    <p class="text-[10px] text-slate-400 text-center">所有转换均在本地浏览器完成，不会上传服务器</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：文件列表区 -->
+        <div class="lg:col-span-8 space-y-4">
+            <!-- 上传区域 -->
+            <div id="dropZone" class="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center bg-white hover:border-indigo-400 hover:bg-indigo-50/50 transition-all cursor-pointer group relative">
+                <input type="file" id="fileInput" multiple accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer" />
+                <div class="flex flex-col items-center">
+                    <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                        <i data-lucide="plus" class="w-6 h-6"></i>
+                    </div>
+                    <p class="text-lg font-medium text-slate-700">点击或拖拽多张图片至此处</p>
+                    <p class="text-sm text-slate-400 mt-1">支持 JPG, PNG, WEBP 等格式</p>
+                </div>
+            </div>
+
+            <!-- 列表视图 -->
+            <div id="fileList" class="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                <!-- 初始空状态 -->
+                <div id="emptyState" class="py-20 text-center text-slate-400">
+                    <i data-lucide="image" class="w-12 h-12 mx-auto mb-3 opacity-20"></i>
+                    <p>暂未添加任何文件</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 等待 DOM 加载完成
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+
+            const state = {
+                files: [], // { id, file, status: 'waiting'|'processing'|'done'|'error', svg: null, name: '', fullSvg: '' }
+                isProcessing: false
+            };
+
+            const dom = {
+                fileInput: document.getElementById('fileInput'),
+                fileList: document.getElementById('fileList'),
+                emptyState: document.getElementById('emptyState'),
+                downloadZipBtn: document.getElementById('downloadZipBtn'),
+                exportJsonBtn: document.getElementById('exportJsonBtn'),
+                clearAllBtn: document.getElementById('clearAllBtn'),
+                globalStats: document.getElementById('globalStats'),
+                colorHex: document.getElementById('colorHex'),
+                fillColor: document.getElementById('fillColor'),
+                threshold: document.getElementById('threshold'),
+                alpha: document.getElementById('alpha'),
+                turd: document.getElementById('turd'),
+                dropZone: document.getElementById('dropZone')
+            };
+
+            const config = {
+                get threshold() { return parseInt(dom.threshold.value); },
+                get alpha() { return parseFloat(dom.alpha.value) / 100; },
+                get turd() { return parseInt(dom.turd.value); },
+                get color() { return dom.fillColor.value; }
+            };
+
+            // 安全地为滑动条绑定事件并更新显示
+            const sliderIds = ['threshold', 'alpha', 'turd'];
+            sliderIds.forEach(id => {
+                const inputEl = dom[id];
+                const displayEl = document.getElementById(id + 'Val');
+                if (inputEl && displayEl) {
+                    inputEl.addEventListener('input', () => {
+                        displayEl.textContent = id === 'alpha' ? (inputEl.value / 100).toFixed(2) : inputEl.value;
+                    });
+                }
+            });
+
+            // 颜色联动
+            if (dom.fillColor && dom.colorHex) {
+                dom.fillColor.oninput = () => dom.colorHex.value = dom.fillColor.value;
+                dom.colorHex.oninput = () => {
+                    if(/^#[0-9A-F]{6}$/i.test(dom.colorHex.value)) dom.fillColor.value = dom.colorHex.value;
+                };
+            }
+
+            // 文件选择处理
+            if (dom.fileInput) {
+                dom.fileInput.onchange = (e) => {
+                    const addedFiles = Array.from(e.target.files).map(f => ({
+                        id: Math.random().toString(36).substr(2, 9),
+                        file: f,
+                        name: f.name.replace(/\.[^/.]+$/, ""),
+                        status: 'waiting',
+                        svg: null,
+                        fullSvg: ''
+                    }));
+                    
+                    state.files = [...state.files, ...addedFiles];
+                    renderList();
+                    processQueue();
+                    dom.fileInput.value = ""; 
+                };
+            }
+
+            if (dom.clearAllBtn) {
+                dom.clearAllBtn.onclick = () => {
+                    state.files = [];
+                    renderList();
+                };
+            }
+
+            function renderList() {
+                if (!dom.fileList || !dom.emptyState || !dom.clearAllBtn) return;
+
+                if (state.files.length === 0) {
+                    dom.emptyState.classList.remove('hidden');
+                    dom.clearAllBtn.classList.add('hidden');
+                } else {
+                    dom.emptyState.classList.add('hidden');
+                    dom.clearAllBtn.classList.remove('hidden');
+                }
+
+                dom.fileList.innerHTML = '';
+                state.files.forEach(item => {
+                    const row = document.createElement('div');
+                    row.className = `flex items-center justify-between p-4 bg-white border rounded-xl transition-all ${item.status === 'processing' ? 'border-indigo-300 ring-2 ring-indigo-50' : 'border-slate-100 hover:border-slate-200'}`;
+                    
+                    const statusIcons = {
+                        waiting: `<i data-lucide="clock" class="w-4 h-4 text-slate-300"></i>`,
+                        processing: `<i data-lucide="loader-2" class="w-4 h-4 text-indigo-500 animate-spin"></i>`,
+                        done: `<i data-lucide="check-circle-2" class="w-4 h-4 text-green-500"></i>`,
+                        error: `<i data-lucide="alert-circle" class="w-4 h-4 text-red-500"></i>`
+                    };
+
+                    row.innerHTML = `
+                        <div class="flex items-center gap-4 flex-1 min-w-0">
+                            <div class="w-10 h-10 bg-slate-50 rounded overflow-hidden flex-shrink-0 flex items-center justify-center border border-slate-100">
+                                 ${item.status === 'done' ? `<div class="p-1">${item.svg}</div>` : `<i data-lucide="image" class="w-5 h-5 text-slate-300"></i>`}
+                            </div>
+                            <div class="truncate">
+                                <p class="text-sm font-medium text-slate-700 truncate">${item.file.name}</p>
+                                <p class="text-[11px] text-slate-400 capitalize flex items-center gap-1">
+                                    ${statusIcons[item.status] || ''} 
+                                    <span>${item.status === 'done' ? '转换完成' : 
+                                           item.status === 'processing' ? '正在处理...' : 
+                                           item.status === 'waiting' ? '等待队列中' : '错误'}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 ml-4">
+                            ${item.status === 'done' ? `
+                                <button onclick="window.downloadSingle('${item.id}')" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="下载单个 SVG">
+                                    <i data-lucide="download" class="w-4 h-4"></i>
+                                </button>
+                            ` : ''}
+                            <button onclick="window.removeFile('${item.id}')" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="移除">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    `;
+                    dom.fileList.appendChild(row);
+                });
+                lucide.createIcons();
+                updateUI();
+            }
+
+            async function processQueue() {
+                if (state.isProcessing) return;
+                
+                const nextItem = state.files.find(f => f.status === 'waiting');
+                if (!nextItem) {
+                    state.isProcessing = false;
+                    updateUI();
+                    return;
+                }
+
+                state.isProcessing = true;
+                nextItem.status = 'processing';
+                renderList();
+
+                try {
+                    const result = await vectorize(nextItem);
+                    nextItem.svg = result.preview;
+                    nextItem.fullSvg = result.full;
+                    nextItem.status = 'done';
+                } catch (err) {
+                    console.error("Vectorization failed:", err);
+                    nextItem.status = 'error';
+                }
+
+                state.isProcessing = false;
+                renderList();
+                processQueue();
+            }
+
+            function vectorize(item) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        Potrace.loadImageFromUrl(e.target.result);
+                        Potrace.process(() => {
+                            let svg = Potrace.getSVG(1);
+                            // 应用填充颜色
+                            svg = svg.replace(/fill="[^"]*"/g, `fill="${config.color}"`);
+                            // 保持预览比例
+                            const previewSvg = svg.replace('<svg', '<svg style="width:100%;height:100%" preserveAspectRatio="xMidYMid meet"');
+                            
+                            resolve({
+                                preview: previewSvg,
+                                full: svg
+                            });
+                        }, {
+                            threshold: config.threshold,
+                            alphamax: config.alpha,
+                            turdsize: config.turd,
+                            optcurve: true
+                        });
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(item.file);
+                });
+            }
+
+            function updateUI() {
+                if (!dom.globalStats || !dom.downloadZipBtn || !dom.exportJsonBtn) return;
+                const doneCount = state.files.filter(f => f.status === 'done').length;
+                const total = state.files.length;
+                
+                dom.globalStats.textContent = total > 0 ? `已完成 ${doneCount} / ${total}` : '准备就绪';
+                dom.downloadZipBtn.disabled = doneCount === 0;
+                dom.exportJsonBtn.disabled = doneCount === 0;
+            }
+
+            // 全局挂载函数供 HTML 调用
+            window.removeFile = (id) => {
+                state.files = state.files.filter(f => f.id !== id);
+                renderList();
+            };
+
+            window.downloadSingle = (id) => {
+                const item = state.files.find(f => f.id === id);
+                if (!item || !item.fullSvg) return;
+                const blob = new Blob([item.fullSvg], {type: 'image/svg+xml'});
+                saveAs(blob, `${item.name}.svg`);
+            };
+
+            // 打包下载 ZIP
+            if (dom.downloadZipBtn) {
+                dom.downloadZipBtn.onclick = async () => {
+                    const zip = new JSZip();
+                    const doneFiles = state.files.filter(f => f.status === 'done');
+                    
+                    doneFiles.forEach(item => {
+                        zip.file(`${item.name}.svg`, item.fullSvg);
+                    });
+
+                    const content = await zip.generateAsync({type: "blob"});
+                    saveAs(content, `vectors_pack_${Date.now()}.zip`);
+                };
+            }
+
+            // 导出 JSON 格式
+            if (dom.exportJsonBtn) {
+                dom.exportJsonBtn.onclick = () => {
+                    const doneFiles = state.files.filter(f => f.status === 'done');
+                    const jsonData = doneFiles.map(item => ({
+                        id: item.id,
+                        name: item.name,
+                        svg: item.fullSvg
+                    }));
+
+                    const blob = new Blob([JSON.stringify(jsonData, null, 2)], {type: 'application/json'});
+                    saveAs(blob, `vectors_config_${Date.now()}.json`);
+                };
+            }
+
+            function saveAs(blob, filename) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+
+            // 拖拽上传逻辑
+            if (dom.dropZone) {
+                ['dragenter', 'dragover'].forEach(name => {
+                    dom.dropZone.addEventListener(name, (e) => {
+                        e.preventDefault();
+                        dom.dropZone.classList.add('border-indigo-400', 'bg-indigo-50/50');
+                    }, false);
+                });
+                ['dragleave', 'drop'].forEach(name => {
+                    dom.dropZone.addEventListener(name, (e) => {
+                        e.preventDefault();
+                        dom.dropZone.classList.remove('border-indigo-400', 'bg-indigo-50/50');
+                    }, false);
+                });
+                dom.dropZone.addEventListener('drop', (e) => {
+                    const dt = e.dataTransfer;
+                    const files = dt.files;
+                    if (files && files.length > 0) {
+                        const addedFiles = Array.from(files).filter(f => f.type.startsWith('image/')).map(f => ({
+                            id: Math.random().toString(36).substr(2, 9),
+                            file: f,
+                            name: f.name.replace(/\.[^/.]+$/, ""),
+                            status: 'waiting',
+                            svg: null,
+                            fullSvg: ''
+                        }));
+                        if (addedFiles.length > 0) {
+                            state.files = [...state.files, ...addedFiles];
+                            renderList();
+                            processQueue();
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
